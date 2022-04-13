@@ -1,15 +1,23 @@
 from os import path
 from typing import List
-import numpy as np
 
+import numpy as np
+import torch
 from torch import Tensor
 from torch.jit import ScriptModule
-import torch
 
 from state_agent.model import StateModel
 
-
 MODEL_FILENAME = 'state_agent.pt'
+
+KART_CENTER = 'kart_center'
+KART_ANGLE = 'kart_angle'
+KART_TO_PUCK_ANGLE = 'kart_to_puck_angle'
+GOAL_LINE_CENTER = 'goal_line_center'
+KART_TO_PUCK_ANGLE_DIFF = 'kart_to_puck_angle_diff'
+PUCK_CENTER = 'puck_center'
+PUCK_TO_GOAL_LINE_ANGLE = 'puck_to_goal_line_angle'
+PUCK_TO_GOAL_LINE_DIST = 'puck_to_goal_line_dist'
 
 
 def limit_period(angle):
@@ -17,12 +25,12 @@ def limit_period(angle):
     return angle - torch.floor(angle / 2 + 0.5) * 2
 
 
-def extract_features(player_id: int,
-                     player_state: List[dict],
-                     soccer_state: dict,
-                     opponent_state: List[dict],
-                     team_id: int
-                     ) -> Tensor:
+def state_to_tensor(player_id: int,
+                    player_state: List[dict],
+                    soccer_state: dict,
+                    opponent_state: List[dict],
+                    team_id: int
+                    ) -> Tensor:
     pstate = player_state[player_id]
 
     # features of ego-vehicle
@@ -46,18 +54,19 @@ def extract_features(player_id: int,
     puck_to_goal_line_angle = torch.atan2(puck_to_goal_line_diff[1], puck_to_goal_line_diff[0])
     puck_to_goal_line_dist = torch.norm(puck_to_goal_line_diff)
 
-    features = torch.tensor(
+    features_tensor = torch.tensor(
         [
+            team_id,
             kart_center[0], kart_center[1],
             kart_angle, kart_to_puck_angle,
-            goal_line_center[0], goal_line_center[1],  # Goal location (TODO: remove)
+            goal_line_center[0], goal_line_center[1],  # Goal location (potentially useless)
             kart_to_puck_angle_difference,
             puck_center[0], puck_center[1],  # Ball location
             puck_to_goal_line_angle, puck_to_goal_line_dist
         ],
         dtype=torch.float32)
 
-    return features
+    return features_tensor
 
 
 def load_model(filename: str = MODEL_FILENAME) -> ScriptModule:

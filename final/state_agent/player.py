@@ -1,16 +1,17 @@
 
-from typing import List
-import torch
+from typing import List, Optional
 
+import torch
 from torch.jit import ScriptModule
 
-from .utils import extract_features, load_model
+from .utils import load_model, state_to_tensor
 
 
 class Team:
     agent_type = 'state'
 
-    def __init__(self):
+    def __init__(self,
+                 model: Optional[ScriptModule] = None):
         """
         TODO: Load your agent here. Load network parameters, and other parts
         of our model. We will call this function with default arguments only.
@@ -18,8 +19,11 @@ class Team:
         self.team: int = 0
         self.num_players: int = 0
 
-        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.model: ScriptModule = load_model().to(device)
+        if model is not None:
+            self.model: ScriptModule = model
+        else:
+            device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+            self.model: ScriptModule = load_model().to(device)
 
     def new_match(self, team: int, num_players: int) -> List[str]:
         """
@@ -73,8 +77,8 @@ class Team:
         """
         actions = []
         for player_id in range(len(player_state)):
-            features = extract_features(player_id, player_state, soccer_state,
-                                        opponent_state, self.team)
+            features = state_to_tensor(player_id, player_state, soccer_state,
+                                       opponent_state, self.team)
 
             acceleration, steer, brake = self.model(features)
             actions.append(dict(acceleration=acceleration, steer=steer, brake=brake))
