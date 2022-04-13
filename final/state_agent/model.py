@@ -21,9 +21,7 @@ class StateModel(nn.Module):
         # If you violate that assumption, you will need to change this
         is_blue = input_tensor[:, 0] == 1
         if self.flip_for_blue:
-            print('Before', input_tensor)
             input_tensor = flip_input_for_blue(input_tensor, is_blue)
-            print('After', input_tensor)
 
         # TODO: Build a decent model
         network_output: Tensor = self.network(input_tensor)
@@ -50,7 +48,7 @@ def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
         True,   # puck_to_goal_line_angle
         False,  # puck_to_goal_line_dist
     ])
-    flip_multiple = torch.where(should_flip_feature, -1., 1.)
+    flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
     return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)
 
 
@@ -60,5 +58,5 @@ def flip_output_for_blue(output_tensor: Tensor, is_blue: Tensor) -> Tensor:
         True,   # steer
         False,  # brake
     ])
-    flip_multiple = torch.where(should_flip_feature, -1., 1.)
+    flip_multiple = torch.where(should_flip_feature, -1., 1.).to(output_tensor.device)
     return torch.where(is_blue[:, None], output_tensor * flip_multiple[None, :], output_tensor)
