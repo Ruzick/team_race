@@ -32,8 +32,8 @@ def map_image(team1_state, team2_state, soccer_state, resolution=512, extent=65,
 
     draw = ImageDraw.Draw(r)
     # Let's draw the goal line
-    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][0]], width=5*anti_alias, fill=RED_COLOR)
-    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][1]], width=5*anti_alias, fill=BLUE_COLOR)
+    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][0]], width=5*anti_alias, fill=BLUE_COLOR)
+    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][1]], width=5*anti_alias, fill=RED_COLOR)
 
     # and the ball
     x, _, y = soccer_state['ball']['location']
@@ -41,7 +41,7 @@ def map_image(team1_state, team2_state, soccer_state, resolution=512, extent=65,
     draw.ellipse((_to_coord(x-s), _to_coord(y-s), _to_coord(x+s), _to_coord(y+s)), width=2*anti_alias, fill=BALL_COLOR)
 
     # and karts
-    for c, s in [(BLUE_COLOR, team1_state), (RED_COLOR, team2_state)]:
+    for c, s in [(RED_COLOR, team1_state), (BLUE_COLOR, team2_state)]:
         for k in s:
             x, _, y = k['kart']['location']
             fx, _, fy = k['kart']['front']
