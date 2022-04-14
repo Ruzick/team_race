@@ -30,7 +30,7 @@ class StateModel(nn.Module):
         if self.flip_for_blue:
             output_tensor = flip_output_for_blue(output_tensor, is_blue)
 
-        return torch.squeeze(output_tensor)
+        return torch.unsqueeze(torch.squeeze(output_tensor), -1)
 
 
 def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:

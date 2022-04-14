@@ -1,83 +1,16 @@
 import argparse
-from typing import List, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
 from state_agent.model import StateModel
-from state_agent.player import Team
-from state_agent.utils import save_model, state_to_tensor
+from state_agent.utils import save_model
+from torch import Tensor
 from torch.jit import ScriptModule
-from tournament.runner import Match, TeamRunner
-from tournament.utils import (BaseRecorder, DataRecorder, MultiRecorder,
-                              VideoRecorder)
+from torch.utils.data import DataLoader
+
+from trainer.data import generate_data
 
 
-def play_match(match: Match,
-               team1_runner: TeamRunner,
-               team2_runner: TeamRunner,
-               video_path: Optional[str] = None,
-               num_frames: Optional[int] = None,
-               initial_ball_location: Optional[Tuple[float, float]] = None,
-               initial_ball_velocity: Optional[Tuple[float, float]] = None
-               ) -> List[dict]:
-
-    recorders: List[BaseRecorder] = []
-    if video_path is not None:
-        recorders.append(VideoRecorder(video_path))
-    data_recorder = DataRecorder()
-    recorders.append(data_recorder)
-
-    optional_arguments_dict = {}
-    if num_frames is not None:
-        optional_arguments_dict['max_frames'] = num_frames
-    if initial_ball_location is not None:
-        optional_arguments_dict['initial_ball_location'] = initial_ball_location
-    if initial_ball_velocity is not None:
-        optional_arguments_dict['initial_ball_velocity'] = initial_ball_velocity
-
-    match.run(team1_runner,
-              team2_runner,
-              num_player=2,
-              record_fn=MultiRecorder(*recorders),
-              **optional_arguments_dict)
-
-    return data_recorder.data()
-
-
-def generate_data(team_or_dir1: Union[ScriptModule, str],
-                  team_or_dir2: Union[ScriptModule, str],
-                  num_matches: int,
-                  video_path: Optional[str] = None,
-                  num_frames: Optional[int] = None,
-                  initial_ball_location: Optional[Tuple[float, float]] = None,
-                  initial_ball_velocity: Optional[Tuple[float, float]] = None
-                  ) -> List[List[dict]]:
-    """
-    :return: List[List[dict]]  dict contains the relevant state at the given time
-                               Inner list contains all the state for a match
-                               Outer list contains all match states
-    """
-    if isinstance(team_or_dir1, str):
-        team1_runner = TeamRunner(team_or_dir1)
-    else:
-        team1_runner = TeamRunner(Team(team_or_dir1))
-
-    if isinstance(team_or_dir2, str):
-        team2_runner = TeamRunner(team_or_dir2)
-    else:
-        team2_runner = TeamRunner(Team(team_or_dir2))
-
-    match = Match()
-
-    matches_data = [
-        play_match(match, team1_runner, team2_runner, video_path,
-                   num_frames, initial_ball_location, initial_ball_velocity)
-        for _ in range(num_matches)
-    ]
-
-    del match
-
-    return matches_data
+BATCH_SIZE = 128
 
 
 def train(args: argparse.Namespace):
@@ -93,22 +26,23 @@ def train(args: argparse.Namespace):
 
     # Just trying both players on 1 example to check nothing is breaking
     # Nothing is getting learned!
-    matches_data = generate_data('jurgen_agent', model, 2)
-    frame_data = matches_data[0][0]
-    input_tensor = state_to_tensor(
-        1,  # Blue
-        frame_data['team1_state'],
-        frame_data['team2_state'],
-        frame_data['soccer_state'])
-    print('Input tensor', input_tensor)
-    output: Tensor = model(input_tensor)
-    output.sum().backward()
+    dataset = generate_data('jurgen_agent', model, 2, use_red_data=False, use_blue_data=True)
+    data_loader = DataLoader(dataset, args.batch_size, shuffle=False)
+
+    for features_batch, actions_batch, rewards_batch in data_loader:
+        print('Feature tensor', features_batch[0])
+        print(features_batch.size(0), len(actions_batch))
+        output: Tensor = model(features_batch)
+        output.sum().backward()
 
     save_model(model)
 
 
 def main():
     parser = argparse.ArgumentParser()
+
+    # Training args
+    parser.add_argument('-bs', '--batch-size', type=int, default=BATCH_SIZE)
 
     parser.add_argument('--no-flip-for-blue', action='store_true')
 
