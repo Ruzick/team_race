@@ -11,7 +11,7 @@ class StateModel(nn.Module):
         super().__init__()
         self.device = torch.device('cpu')
         # TODO: Choose a decent network architecture
-        self.network = torch.nn.Linear(12, 3)
+        self.network = torch.nn.Linear(13, 6)
         self.flip_for_blue = flip_for_blue
 
     def forward(self, input_tensor: Tensor):
@@ -34,29 +34,19 @@ class StateModel(nn.Module):
 
 
 def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
-    should_flip_feature = torch.tensor([
-        False,  # team_id
-        False,  # kart_center[0]
-        True,   # kart_center[1]
-        True,   # kart_angle
-        True,   # kart_to_puck_angle
-        False,  # goal_line_center[0]
-        True,   # goal_line_center[1]
-        True,   # kart_to_puck_angle_difference
-        False,  # puck_center[0]
-        True,   # puck_center[1]
-        True,   # puck_to_goal_line_angle
-        False,  # puck_to_goal_line_dist
-    ])
+    assert input_tensor.size(-1) == 13, \
+           f'Input tensor size {input_tensor.shape} does not match expected size'
+    should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
+    should_flip_feature[1] = True  # ball to defence goal angle
+    should_flip_feature[3] = True  # ball to attack goal angle
+
     flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
     return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)
 
 
-def flip_output_for_blue(output_tensor: Tensor, is_blue: Tensor) -> Tensor:
-    should_flip_feature = torch.tensor([
-        False,  # acceleration
-        True,   # steer
-        False,  # brake
-    ])
-    flip_multiple = torch.where(should_flip_feature, -1., 1.).to(output_tensor.device)
-    return torch.where(is_blue[:, None], output_tensor * flip_multiple[None, :], output_tensor)
+def flip_output_for_blue(output_tensor: Tensor, _: Tensor) -> Tensor:
+    assert output_tensor.size(-1) == 6, \
+           f'Output tensor size {output_tensor.shape} does not match expected size'
+
+    # Currently logic does not require any flipping for output
+    return output_tensor

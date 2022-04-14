@@ -91,16 +91,15 @@ def train(args: argparse.Namespace):
 
     # TODO: Start training here
 
-    # Just trying 1 player on 1 example to check nothing is breaking
+    # Just trying both players on 1 example to check nothing is breaking
     # Nothing is getting learned!
-    matches_data = generate_data(model, 'jurgen_agent', 1)
+    matches_data = generate_data('jurgen_agent', model, 2)
     frame_data = matches_data[0][0]
     input_tensor = state_to_tensor(
-        0,
+        1,  # Blue
         frame_data['team1_state'],
-        frame_data['soccer_state'],
         frame_data['team2_state'],
-        1)  # Blue
+        frame_data['soccer_state'])
     print('Input tensor', input_tensor)
     output: Tensor = model(input_tensor)
     output.sum().backward()

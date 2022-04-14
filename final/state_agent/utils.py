@@ -10,61 +10,72 @@ from state_agent.model import StateModel
 
 MODEL_FILENAME = 'state_agent.pt'
 
-KART_CENTER = 'kart_center'
-KART_ANGLE = 'kart_angle'
-KART_TO_PUCK_ANGLE = 'kart_to_puck_angle'
-GOAL_LINE_CENTER = 'goal_line_center'
-KART_TO_PUCK_ANGLE_DIFF = 'kart_to_puck_angle_diff'
-PUCK_CENTER = 'puck_center'
-PUCK_TO_GOAL_LINE_ANGLE = 'puck_to_goal_line_angle'
-PUCK_TO_GOAL_LINE_DIST = 'puck_to_goal_line_dist'
-
 
 def limit_period(angle):
     # turn angle into -1 to 1
     return angle - torch.floor(angle / 2 + 0.5) * 2
 
 
-def state_to_tensor(player_id: int,
-                    player_state: List[dict],
-                    soccer_state: dict,
-                    opponent_state: List[dict],
-                    team_id: int
-                    ) -> Tensor:
-    pstate = player_state[player_id]
+def get_ball_to_goal_tensor(ball_center: Tensor, goal_center: Tensor) -> Tensor:
+    ball_to_goal_diff = goal_center - ball_center
+    ball_to_goal_angle = torch.atan2(ball_to_goal_diff[1], ball_to_goal_diff[0])
+    ball_to_goal_dist = torch.norm(ball_to_goal_diff)
+    return torch.tensor([ball_to_goal_angle, ball_to_goal_dist], dtype=torch.float32)
 
-    # features of ego-vehicle
-    kart_front = torch.tensor(pstate['kart']['front'], dtype=torch.float32)[[0, 2]]
-    kart_center = torch.tensor(pstate['kart']['location'], dtype=torch.float32)[[0, 2]]
-    kart_direction = (kart_front - kart_center) / torch.norm(kart_front - kart_center)
+
+def get_kart_to_ball_tensor(kart_state: dict, ball_center: Tensor) -> Tensor:
+    kart_front = torch.tensor(kart_state['front'], dtype=torch.float32)[[0, 2]]
+    kart_center = torch.tensor(kart_state['location'], dtype=torch.float32)[[0, 2]]
+    kart_direction = kart_front - kart_center
     kart_angle = torch.atan2(kart_direction[1], kart_direction[0])
 
-    # features of soccer ball
-    puck_center = torch.tensor(soccer_state['ball']['location'], dtype=torch.float32)[[0, 2]]
-    kart_to_puck_direction = (puck_center - kart_center) / torch.norm(puck_center - kart_center)
+    kart_to_puck_direction = ball_center - kart_center
     kart_to_puck_angle = torch.atan2(kart_to_puck_direction[1], kart_to_puck_direction[0])
 
     kart_to_puck_angle_difference = limit_period((kart_angle - kart_to_puck_angle) / np.pi)
+    kart_to_puck_distance = torch.norm(kart_to_puck_direction)
 
-    # features of goal-line
-    goal_line_center = torch.tensor(soccer_state['goal_line'][(team_id + 1) % 2],
-                                    dtype=torch.float32)[:, [0, 2]].mean(dim=0)
+    return torch.tensor([kart_to_puck_angle_difference, kart_to_puck_distance],
+                        dtype=torch.float32)
 
-    puck_to_goal_line_diff = goal_line_center - puck_center
-    puck_to_goal_line_angle = torch.atan2(puck_to_goal_line_diff[1], puck_to_goal_line_diff[0])
-    puck_to_goal_line_dist = torch.norm(puck_to_goal_line_diff)
 
-    features_tensor = torch.tensor(
+def state_to_tensor(team_id: int,
+                    player_state: List[dict],
+                    opponent_state: List[dict],
+                    soccer_state: dict,
+                    ) -> Tensor:
+
+    # features of soccer ball
+    ball_center = torch.tensor(soccer_state['ball']['location'], dtype=torch.float32)[[0, 2]]
+
+    # features of goal-lines
+    goal_centers = (
+        torch.tensor(
+            soccer_state['goal_line'][(team_id + i) % 2],
+            dtype=torch.float32
+        )[:, [0, 2]].mean(dim=0)
+        for i in range(2)
+    )
+    goal_tensors = [
+        get_ball_to_goal_tensor(ball_center, goal_center)
+        for goal_center in goal_centers
+    ]
+
+    # features of karts
+    player_and_opponent_kart_states = (
+        state['kart'] for state in player_state + opponent_state
+    )
+    kart_tensors = [
+        get_kart_to_ball_tensor(kart_state, ball_center)
+        for kart_state in player_and_opponent_kart_states
+    ]
+
+    features_tensor = torch.cat(
         [
-            team_id,
-            kart_center[0], kart_center[1],
-            kart_angle, kart_to_puck_angle,
-            goal_line_center[0], goal_line_center[1],  # Goal location (potentially useless)
-            kart_to_puck_angle_difference,
-            puck_center[0], puck_center[1],  # Ball location
-            puck_to_goal_line_angle, puck_to_goal_line_dist
-        ],
-        dtype=torch.float32)
+            torch.tensor([team_id], dtype=torch.float32),
+            *goal_tensors,
+            *kart_tensors,
+        ])
 
     return features_tensor
 

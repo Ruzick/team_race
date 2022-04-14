@@ -75,11 +75,18 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
-        actions = []
-        for player_id in range(len(player_state)):
-            features = state_to_tensor(player_id, player_state, soccer_state,
-                                       opponent_state, self.team)
-
-            acceleration, steer, brake = self.model(features)
-            actions.append(dict(acceleration=acceleration, steer=steer, brake=brake))
-        return actions
+        features = state_to_tensor(self.team, player_state, opponent_state,
+                                   soccer_state)
+        p1_accel, p1_steer, p1_brake, p2_accel, p2_steer, p2_brake = self.model(features)
+        return [
+            {
+                'acceleration': p1_accel,
+                'steer': p1_steer,
+                'brake': p1_brake,
+            },
+            {
+                'acceleration': p2_accel,
+                'steer': p2_steer,
+                'brake': p2_brake,
+            },
+        ]
