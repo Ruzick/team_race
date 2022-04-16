@@ -8,14 +8,15 @@ from state_agent.model import ActorModel, CriticModel
 from state_agent.utils import copy_parameters, save_model
 from torch import Tensor
 from torch.jit import ScriptModule
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import DataLoader
 
 from trainer.algorithm import AlgorithmImpl
-from trainer.data import FramesDataset, generate_data
+from trainer.data import FramesDataset, generate_data, merge_datasets
 from trainer.reward import RewardCriteria, RewardCriterion
 
 LOG_DIR = 'log/'
 MAX_EPOCH_SAMPLES = 1000
+MAX_DATASET_SIZE = 20000
 GAMMA = 0.99
 TAU = 0.001
 ACTOR_LR = 0.01
@@ -27,6 +28,7 @@ class DDPG(AlgorithmImpl):
         subparser.add_argument('-g', '--gamma', type=float, default=GAMMA)
         subparser.add_argument('-alr', '--actor-learning-rate', type=float, default=ACTOR_LR)
         subparser.add_argument('-clr', '--critic-learning-rate', type=float, default=CRITIC_LR)
+        subparser.add_argument('-mds', '--max-dataset-size', type=int, default=MAX_DATASET_SIZE)
         subparser.add_argument('--tau', type=float, default=TAU)
         subparser.add_argument('-N', '--max-epoch-samples', type=int, default=MAX_EPOCH_SAMPLES)
 
@@ -85,14 +87,14 @@ def train(args: argparse.Namespace):
     actor_optimizer = torch.optim.Adam(actor_model.parameters())
     critic_optimizer = torch.optim.Adam(critic_model.parameters())
 
-    dataset = FramesDataset([[]], [[]], [[]])
+    dataset = FramesDataset()
 
     reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST)
 
     for i_epoch in range(args.epochs):
         print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
 
-        dataset = ConcatDataset([
+        dataset = merge_datasets(
             dataset,
             generate_data('jurgen_agent', actor_model, 1, reward_criteria, use_red_data=False,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
@@ -100,7 +102,8 @@ def train(args: argparse.Namespace):
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
             generate_data(actor_model, actor_model, 1, reward_criteria,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
-        ])
+        )
+        dataset.discard_to_max_size(args.max_dataset_size)
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
 
         actor_optimizer.zero_grad()
