@@ -1,18 +1,16 @@
 from typing import List, Optional, Tuple, Union
 
 import torch
-
-from torch import Tensor
-
 from state_agent.player import Team
+from state_agent.utils import state_to_tensor
+from torch import Tensor
 from torch.jit import ScriptModule
 from torch.utils.data import Dataset
-from state_agent.utils import state_to_tensor
 from tournament.runner import Match, TeamRunner
 from tournament.utils import (BaseRecorder, DataRecorder, MultiRecorder,
                               VideoRecorder)
 
-SCORE_UTILITY_MULTIPLIER = 10000
+from trainer.reward import RewardCriteria, get_match_rewards
 
 
 class FramesDataset(Dataset):
@@ -85,6 +83,7 @@ class FramesDataset(Dataset):
 def generate_data(team_or_dir1: Union[ScriptModule, str],
                   team_or_dir2: Union[ScriptModule, str],
                   num_matches: int,
+                  reward_criteria: RewardCriteria,
                   use_red_data: bool = True,
                   use_blue_data: bool = True,
                   video_path: Optional[str] = None,
@@ -117,14 +116,14 @@ def generate_data(team_or_dir1: Union[ScriptModule, str],
     red_matches_rewards: List[List[float]] = [[]]
     if use_red_data:
         red_matches_rewards = [
-            get_match_rewards(match_data, 0)
+            get_match_rewards(match_data, 0, reward_criteria)
             for match_data in matches_data
         ]
 
     blue_matches_rewards: List[List[float]] = [[]]
     if use_blue_data:
         blue_matches_rewards = [
-            get_match_rewards(match_data, 1)
+            get_match_rewards(match_data, 1, reward_criteria)
             for match_data in matches_data
         ]
 
@@ -161,42 +160,3 @@ def play_match(match: Match,
               **optional_arguments_dict)
 
     return data_recorder.data()
-
-
-def dist_from_goals(soccer_state: dict, team_id: int) -> List[float]:
-    # features of soccer ball
-    ball_center = torch.tensor(soccer_state['ball']['location'], dtype=torch.float32)[[0, 2]]
-
-    # features of goal-lines
-    goal_centers = (
-        torch.tensor(
-            soccer_state['goal_line'][(team_id + i) % 2],
-            dtype=torch.float32
-        )[:, [0, 2]].mean(dim=0)
-        for i in range(2)
-    )
-
-    return [
-        torch.norm(goal_center - ball_center) for goal_center in goal_centers
-    ]
-
-
-def get_match_rewards(match_data: List[dict], team_id: int) -> List[float]:
-    dist_from_goal_utilities = torch.tensor([
-        (
-            torch.tensor(dist_from_goals(frame_data['soccer_state'], team_id))
-            * torch.tensor([-1, 1])
-        ).sum().item()
-        for frame_data in match_data
-    ])
-
-    score_utilites = torch.tensor([
-        (frame_data['soccer_state']['score'][team_id]
-         - frame_data['soccer_state']['score'][(team_id + 1) % 2]
-         ) * SCORE_UTILITY_MULTIPLIER
-        for frame_data in match_data
-    ])
-
-    utilities = dist_from_goal_utilities + score_utilites
-    rewards = utilities[1:] - utilities[:-1]
-    return list(rewards.numpy())
