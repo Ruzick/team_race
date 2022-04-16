@@ -23,6 +23,7 @@ class ActorModel(nn.Module):
         self.device = device
 
     def forward(self, input_tensor: Tensor):
+        original_device = input_tensor.device
         input_tensor = torch.atleast_2d(input_tensor.to(self.device))
 
         # This assumes the first component of each input tensor is the team id
@@ -32,13 +33,14 @@ class ActorModel(nn.Module):
             input_tensor = self.flip_input_for_blue(input_tensor, is_blue)
 
         network_output: Tensor = self.network(input_tensor)
-        output_tensor = (torch.sigmoid(network_output) * torch.tensor([2., 2., 1., 2., 2., 1.])
-                         + torch.tensor([1., 1., 0., 1., 1., 0.]))
+        output_tensor = (torch.sigmoid(network_output)
+                         * torch.tensor([2., 2., 1., 2., 2., 1.]).to(self.device)
+                         + torch.tensor([1., 1., 0., 1., 1., 0.]).to(self.device))
 
         if self.flip_for_blue:
             output_tensor = self.flip_output_for_blue(output_tensor, is_blue)
 
-        return torch.unsqueeze(torch.squeeze(output_tensor), -1)
+        return torch.unsqueeze(torch.squeeze(output_tensor), -1).to(original_device)
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
@@ -77,6 +79,7 @@ class CriticModel(nn.Module):
         self.flip_for_blue = flip_for_blue
 
     def forward(self, input_tensor) -> Tensor:
+        original_device = input_tensor.device
         input_tensor = torch.atleast_2d(input_tensor.to(self.device))
 
         # This assumes the first component of each input tensor is the team id
@@ -88,7 +91,7 @@ class CriticModel(nn.Module):
         network_output: Tensor = self.network(input_tensor)
         output_tensor = network_output
 
-        return torch.squeeze(output_tensor)
+        return torch.squeeze(output_tensor).to(original_device)
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
