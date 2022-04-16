@@ -34,8 +34,8 @@ class ActorModel(nn.Module):
 
         network_output: Tensor = self.network(input_tensor)
         output_tensor = (torch.sigmoid(network_output)
-                         * torch.tensor([2., 2., 1., 2., 2., 1.]).to(self.device)
-                         + torch.tensor([1., 1., 0., 1., 1., 0.]).to(self.device))
+                         * torch.tensor([1., 2., 1., 1., 2., 1.]).to(self.device)
+                         - torch.tensor([0., 1., 0., 0., 1., 0.]).to(self.device))
 
         if self.flip_for_blue:
             output_tensor = self.flip_output_for_blue(output_tensor, is_blue)

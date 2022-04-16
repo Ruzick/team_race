@@ -80,7 +80,6 @@ def train(args: argparse.Namespace):
     dataset = FramesDataset([[]], [[]], [[]])
 
     for i_epoch in range(args.epochs):
-        print(f'Starting epoch {i_epoch}')
         dataset = ConcatDataset([
             generate_data('jurgen_agent', actor_model, 1, use_red_data=False,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
@@ -90,6 +89,8 @@ def train(args: argparse.Namespace):
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
         ])
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
+
+        print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
 
         actor_optimizer.zero_grad()
         critic_optimizer.zero_grad()
