@@ -6,8 +6,6 @@ import torch
 from torch import Tensor
 from torch.jit import ScriptModule
 
-from state_agent.model import StateModel
-
 MODEL_FILENAME = 'state_agent.pt'
 
 
@@ -84,5 +82,10 @@ def load_model(filename: str = MODEL_FILENAME) -> ScriptModule:
     return torch.jit.load(path.join(path.dirname(path.abspath(__file__)), filename))
 
 
-def save_model(model: StateModel, filename: str = MODEL_FILENAME):
+def save_model(model: ScriptModule, filename: str = MODEL_FILENAME):
     torch.jit.save(model, path.join(path.dirname(path.abspath(__file__)), filename))
+
+
+def copy_parameters(src_model: ScriptModule, dest_model: ScriptModule):
+    state_dict = src_model.state_dict()
+    dest_model.load_state_dict(state_dict)

@@ -25,22 +25,40 @@ class FramesDataset(Dataset):
 
         self.data: List[Tuple[Tensor, List[dict], float]] = []
         for match_data, red_rewards in zip(matches_data, red_matches_rewards):
-            for frame_data, reward in zip(match_data, red_rewards):
-                features_tensor = state_to_tensor(0,
-                                                  frame_data['team1_state'],
-                                                  frame_data['team2_state'],
-                                                  frame_data['soccer_state'])
-                actions = frame_data['actions'][0::2]
-                self.data.append((features_tensor, actions, reward))
+            state_tensor: Optional[Tensor] = None
+            for frame_data, next_frame_data, reward in zip(match_data,
+                                                           match_data[1:],
+                                                           red_rewards):
+                if state_tensor is None:
+                    state_tensor = state_to_tensor(0,
+                                                   frame_data['team1_state'],
+                                                   frame_data['team2_state'],
+                                                   frame_data['soccer_state'])
+                next_state_tensor = state_to_tensor(0,
+                                                    next_frame_data['team1_state'],
+                                                    next_frame_data['team2_state'],
+                                                    next_frame_data['soccer_state'])
+                actions = self.action_dicts_to_tensor(frame_data['actions'][0::2])
+                self.data.append((state_tensor, actions, reward, next_state_tensor))
+
+                state_tensor = next_state_tensor
 
         for match_data, blue_rewards in zip(matches_data, blue_matches_rewards):
-            for frame_data, reward in zip(match_data, blue_rewards):
-                features_tensor = state_to_tensor(1,
-                                                  frame_data['team2_state'],
-                                                  frame_data['team1_state'],
-                                                  frame_data['soccer_state'])
-                actions = frame_data['actions'][1::2]
-                self.data.append((features_tensor, actions, reward))
+            state_tensor: Optional[Tensor] = None
+            for frame_data, next_frame_data, reward in zip(match_data,
+                                                           match_data[1:],
+                                                           blue_rewards):
+                if state_tensor is None:
+                    state_tensor = state_to_tensor(1,
+                                                   frame_data['team2_state'],
+                                                   frame_data['team1_state'],
+                                                   frame_data['soccer_state'])
+                next_state_tensor = state_to_tensor(1,
+                                                    next_frame_data['team2_state'],
+                                                    next_frame_data['team1_state'],
+                                                    next_frame_data['soccer_state'])
+                actions = self.action_dicts_to_tensor(frame_data['actions'][1::2])
+                self.data.append((state_tensor, actions, reward, next_state_tensor))
 
     def __len__(self):
         return len(self.data)
@@ -50,6 +68,18 @@ class FramesDataset(Dataset):
         if self.transform is not None:
             data = self.transform(*data)
         return data
+
+    @staticmethod
+    def action_dicts_to_tensor(action_dicts: List[dict]) -> Tensor:
+        action_lists = [
+            [
+                action_dict['acceleration'],
+                action_dict['steer'],
+                action_dict['brake'],
+            ]
+            for action_dict in action_dicts
+        ]
+        return torch.tensor(action_lists, dtype=torch.float32).flatten()
 
 
 def generate_data(team_or_dir1: Union[ScriptModule, str],
