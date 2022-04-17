@@ -9,6 +9,7 @@ from state_agent.utils import copy_parameters, save_model
 from torch import Tensor
 from torch.jit import ScriptModule
 from torch.utils.data import DataLoader
+from tournament.runner import Match
 
 from trainer.algorithm import AlgorithmImpl
 from trainer.data import FramesDataset, generate_data, merge_datasets
@@ -94,17 +95,20 @@ def train(args: argparse.Namespace):
     dataset = FramesDataset()
 
     reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST)
+    match = Match()
 
     for i_epoch in range(args.epochs):
         print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
 
         dataset = merge_datasets(
             dataset,
-            generate_data('jurgen_agent', actor_model, 1, reward_criteria, use_red_data=False,
+            generate_data(match, 'jurgen_agent', actor_model, 1, reward_criteria,
+                          use_red_data=False, use_blue_data=True,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
-            generate_data(actor_model, 'jurgen_agent', 1, reward_criteria, use_blue_data=False,
+            generate_data(match, actor_model, 'jurgen_agent', 1, reward_criteria,
+                          use_red_data=True, use_blue_data=False,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
-            generate_data(actor_model, actor_model, 1, reward_criteria,
+            generate_data(match, actor_model, actor_model, 1, reward_criteria,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
         )
         dataset.discard_to_max_size(args.max_dataset_size)

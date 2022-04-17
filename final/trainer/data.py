@@ -98,7 +98,8 @@ def merge_datasets(*frame_datasets: FramesDataset) -> FramesDataset:
     return merged_dataset
 
 
-def generate_data(team_or_dir1: Union[ScriptModule, str],
+def generate_data(match: Match,
+                  team_or_dir1: Union[ScriptModule, str],
                   team_or_dir2: Union[ScriptModule, str],
                   num_matches: int,
                   reward_criteria: RewardCriteria,
@@ -123,13 +124,11 @@ def generate_data(team_or_dir1: Union[ScriptModule, str],
     else:
         team2_runner = TeamRunner(Team(team_or_dir2))
 
-    match = Match()
     matches_data = [
         play_match(match, team1_runner, team2_runner, video_path,
                    num_frames, initial_ball_location, initial_ball_velocity)
         for _ in range(num_matches)
     ]
-    del match
 
     red_matches_rewards: List[List[float]] = [[]]
     if use_red_data:
