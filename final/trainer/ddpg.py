@@ -21,6 +21,7 @@ GAMMA = 0.99
 TAU = 0.001
 ACTOR_LR = 0.01
 CRITIC_LR = 0.01
+NOISE_STANDARD_DEVIATION = 0.1
 
 
 class DDPG(AlgorithmImpl):
@@ -31,6 +32,8 @@ class DDPG(AlgorithmImpl):
         subparser.add_argument('-mds', '--max-dataset-size', type=int, default=MAX_DATASET_SIZE)
         subparser.add_argument('--tau', type=float, default=TAU)
         subparser.add_argument('-N', '--max-epoch-samples', type=int, default=MAX_EPOCH_SAMPLES)
+        subparser.add_argument('-ansd', '--actor-noise-standard-deviation', type=float,
+                               default=NOISE_STANDARD_DEVIATION)
 
     def train(self, args: argparse.Namespace):
         train(args)
@@ -64,7 +67,8 @@ def train(args: argparse.Namespace):
     actor_model_generator = get_model_generator(
         ActorModel,
         device=device,
-        flip_for_blue=not args.no_flip_for_blue
+        flip_for_blue=not args.no_flip_for_blue,
+        noise_std_dev=args.actor_noise_standard_deviation
     )
     critic_model_generator = get_model_generator(
         CriticModel,

@@ -1,3 +1,4 @@
+from typing import Callable, Optional
 from torch import Tensor, nn
 import torch
 
@@ -9,7 +10,8 @@ FLIP_FOR_BLUE: bool = True
 class ActorModel(nn.Module):
     def __init__(self,
                  device: torch.device = DEFAULT_DEVICE,
-                 flip_for_blue: bool = FLIP_FOR_BLUE):
+                 flip_for_blue: bool = FLIP_FOR_BLUE,
+                 noise_std_dev: float = 0.):
         super().__init__()
         # TODO: Choose a decent network architecture
         self.network = torch.nn.Sequential(
@@ -21,6 +23,7 @@ class ActorModel(nn.Module):
         )
         self.flip_for_blue = flip_for_blue
         self.device = device
+        self.noise_std_dev = noise_std_dev
 
     def forward(self, input_tensor: Tensor):
         original_device = input_tensor.device
@@ -37,10 +40,20 @@ class ActorModel(nn.Module):
                          * torch.tensor([1., 2., 1., 1., 2., 1.]).to(self.device)
                          - torch.tensor([0., 1., 0., 0., 1., 0.]).to(self.device))
 
+        if self.training:
+            output_tensor = self.apply_noise(output_tensor)
+
         if self.flip_for_blue:
             output_tensor = self.flip_output_for_blue(output_tensor, is_blue)
 
         return torch.unsqueeze(torch.squeeze(output_tensor), -1).to(original_device)
+
+    def apply_noise(self, output_tensor: Tensor) -> Tensor:
+        if self.noise_std_dev <= 0.:
+            return output_tensor
+
+        return output_tensor + torch.normal(torch.zeros(6), self.noise_std_dev * torch.ones(6))
+
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
