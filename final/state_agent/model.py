@@ -52,8 +52,8 @@ class ActorModel(nn.Module):
         if self.noise_std_dev <= 0.:
             return output_tensor
 
-        return output_tensor + torch.normal(torch.zeros(6), self.noise_std_dev * torch.ones(6))
-
+        return (output_tensor
+                + torch.normal(torch.zeros(6), self.noise_std_dev * torch.ones(6)).to(self.device))
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
