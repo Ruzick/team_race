@@ -16,7 +16,7 @@ class DQNModel(nn.Module):
         super().__init__()
         # TODO: Choose a decent network architecture
         self.network = torch.nn.Sequential(
-            torch.nn.Linear(27, 32),
+            torch.nn.Linear(17, 32),
             torch.nn.ReLU(),
             torch.nn.Linear(32, 16),
             torch.nn.ReLU(),
@@ -50,20 +50,20 @@ class DQNModel(nn.Module):
             f'Input tensor size {input_tensor.shape} does not match expected size'
 
         action_extraction_info = [
-            (13, -100000, 0.5),
-            (13, 0.5, 100000),
+            # (13, -100000, 0.5),
+            # (13, 0.5, 100000),
             (14, -100000, -0.5),
-            (14, -0.5, 0.5),
+            # (14, -0.5, 0.5),
             (14, 0.5, 100000),
-            (15, -100000, 0.5),
-            (15, 0.5, 100000),
-            (16, -100000, 0.5),
-            (16, 0.5, 100000),
+            # (15, -100000, 0.5),
+            # (15, 0.5, 100000),
+            # (16, -100000, 0.5),
+            # (16, 0.5, 100000),
             (17, -100000, -0.5),
-            (17, -0.5, 0.5),
+            # (17, -0.5, 0.5),
             (17, 0.5, 100000),
-            (18, -100000, 0.5),
-            (18, 0.5, 100000),
+            # (18, -100000, 0.5),
+            # (18, 0.5, 100000),
         ]
 
         discretized_actions = torch.stack([
@@ -77,7 +77,7 @@ class DQNModel(nn.Module):
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
-        assert input_tensor.size(-1) == 27, \
+        assert input_tensor.size(-1) == 17, \
             f'Input tensor size {input_tensor.shape} does not match expected size'
         should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
         should_flip_feature[1] = True  # ball to defence goal angle
@@ -107,8 +107,8 @@ class DQNPlayerModel(nn.Module):
             action = self.get_best_action(self.dqn_model, state_tensor).squeeze()
 
         return torch.cat([
-            self.to_output_tensor(action[0:7]),
-            self.to_output_tensor(action[7:14]),
+            self.to_output_tensor(action[0:2]),
+            self.to_output_tensor(action[2:4]),
         ])
 
     def get_best_action(self, dqn_model: DQNModel, state_batch: Tensor) -> Tensor:
@@ -129,14 +129,10 @@ class DQNPlayerModel(nn.Module):
 
     @staticmethod
     def get_discretized_actions() -> Tensor:
-        indices = torch.arange(14)
+        indices = torch.arange(4)
         indices_of_each_action = [
-            [0, 1],
-            [2, 3, 4],
-            [5, 6],
-            [7, 8],
-            [9, 10, 11],
-            [12, 13],
+            [-1, 0, 1],
+            [-1, 2, 3],
         ]
         one_hots_of_each_action = [
             [
@@ -151,37 +147,24 @@ class DQNPlayerModel(nn.Module):
             for one_hots_of_action_permutation in itertools.product(*one_hots_of_each_action)
         ]
 
-        assert len(discretized_actions) == 144, 'Unexpected number of discretized actions'
+        assert len(discretized_actions) == 9, 'Unexpected number of discretized actions'
         return discretized_actions
 
     @staticmethod
     def to_output_tensor(discrete_action_fragment: Tensor) -> Tensor:
-        assert discrete_action_fragment.numel() == 7, \
+        assert discrete_action_fragment.numel() == 2, \
             'Unexpected number of elements in action fragment'
 
         output_tensor = torch.zeros(3)
 
-        assert sum(discrete_action_fragment[0:2]) == 1, \
-            'Acceleration set to both 0 and 1, or neither 0 nor 1'
+        # Acceleration
+        output_tensor[0] = 1
+
+        assert sum(discrete_action_fragment[0:2]) <= 1, \
+            'Steer set to both -1 and 1'
         if discrete_action_fragment[0] == 1:
-            output_tensor[0] = 0
+            output_tensor[0] = -1
         elif discrete_action_fragment[1] == 1:
             output_tensor[0] = 1
-
-        assert sum(discrete_action_fragment[2:5]) == 1, \
-            'Expected exactly 1 steer direction to be chosen'
-        if discrete_action_fragment[2] == 1:
-            output_tensor[1] = -1
-        elif discrete_action_fragment[3] == 1:
-            output_tensor[1] = 0
-        elif discrete_action_fragment[4] == 1:
-            output_tensor[1] = 1
-
-        assert sum(discrete_action_fragment[5:7]) == 1, \
-            'Brake set to both False and True, or neither False nor True'
-        if discrete_action_fragment[5] == 1:
-            output_tensor[2] = False
-        elif discrete_action_fragment[6] == 1:
-            output_tensor[2] = True
 
         return output_tensor
