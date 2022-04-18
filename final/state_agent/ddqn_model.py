@@ -163,8 +163,8 @@ class DQNPlayerModel(nn.Module):
         assert sum(discrete_action_fragment[0:2]) <= 1, \
             'Steer set to both -1 and 1'
         if discrete_action_fragment[0] == 1:
-            output_tensor[0] = -1
+            output_tensor[1] = -1
         elif discrete_action_fragment[1] == 1:
-            output_tensor[0] = 1
+            output_tensor[1] = 1
 
         return output_tensor
