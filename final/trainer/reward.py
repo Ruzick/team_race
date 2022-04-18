@@ -53,15 +53,14 @@ def get_match_rewards(match_data: List[dict], team_id: int, reward_criteria: Rew
 
 
 def _get_player_to_ball_dist_rewards(match_data: List[dict], team_id: int) -> Tensor:
-    utilities = torch.tensor([
+    rewards = torch.tensor([
         -1 * torch.tensor(_players_dist_from_ball(frame_data[f'team{team_id + 1}_state'],
                                                   frame_data['soccer_state'])
                           ).sum().item()
         for frame_data in match_data
     ], dtype=torch.float32)
 
-    rewards = utilities[1:] - utilities[:-1]
-    return rewards
+    return rewards[1:]
 
 
 def _players_dist_from_ball(team_state: dict, soccer_state: dict) -> List[float]:
