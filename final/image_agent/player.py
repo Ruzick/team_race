@@ -2,6 +2,7 @@
 class Team:
     agent_type = 'image'
 
+
     def __init__(self):
         """
           TODO: Load your agent here. Load network parameters, and other parts of our model
