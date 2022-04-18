@@ -101,10 +101,6 @@ class PyTux:
 
         last_rescue = 0
 
-        if verbose:
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots(1, 1)
-
         for t in range(max_frames):
 
             state.update()
@@ -135,17 +131,6 @@ class PyTux:
             if current_vel < 1.0 and t - last_rescue > RESCUE_TIMEOUT:
                 last_rescue = t
                 action.rescue = True
-
-            if verbose:
-                ax.clear()
-                ax.imshow(self.k.render_data[0].image)
-                WH2 = np.array([self.config.screen_width, self.config.screen_height]) / 2
-                ax.add_artist(plt.Circle(WH2*(1+self._to_image(kart.location, proj, view)), 2, ec='b', fill=False, lw=1.5))
-                ax.add_artist(plt.Circle(WH2*(1+self._to_image(aim_point_world, proj, view)), 2, ec='r', fill=False, lw=1.5))
-                if planner:
-                    ap = self._point_on_track(kart.distance_down_track + TRACK_OFFSET, track)
-                    ax.add_artist(plt.Circle(WH2*(1+aim_point_image), 2, ec='g', fill=False, lw=1.5))
-                plt.pause(1e-3)
 
             self.k.step(action)
             t += 1
