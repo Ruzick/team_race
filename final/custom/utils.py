@@ -49,6 +49,8 @@ class PyTux:
         pystk.init(self.config)
         self.k = None   #what is k??
 
+
+    '''
     @staticmethod  #not accessing the instances or the class
     def _point_on_track(distance, track, offset=0.0):
         """
@@ -64,6 +66,8 @@ class PyTux:
         x = track.path_nodes[node_idx]
         t = (distance + offset - d[0]) / (d[1] - d[0])
         return x[1] * t + x[0] * (1 - t)
+
+    '''
 
     @staticmethod
     def _to_image(x, proj, view): #what is proj
@@ -98,6 +102,7 @@ class PyTux:
 
         state = pystk.WorldState()
         track = pystk.Track()
+        puck = pystk.SoccerBall()
 
         last_rescue = 0
 
@@ -105,6 +110,7 @@ class PyTux:
 
             state.update()
             track.update()
+            puck.update()
 
             kart = state.players[0].kart
 
@@ -116,7 +122,8 @@ class PyTux:
             proj = np.array(state.players[0].camera.projection).T
             view = np.array(state.players[0].camera.view).T
 
-            aim_point_world = self._point_on_track(kart.distance_down_track+TRACK_OFFSET, track)
+            #aim_point_world = self._point_on_track(kart.distance_down_track+TRACK_OFFSET, track)
+            aim_point_world=puck.ball()
             aim_point_image = self._to_image(aim_point_world, proj, view)
             if data_callback is not None:
                 data_callback(t, np.array(self.k.render_data[0].image), aim_point_image)
