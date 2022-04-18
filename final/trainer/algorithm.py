@@ -6,11 +6,13 @@ from typing import List
 
 class Algorithm(Enum):
     DDPG = 'DDPG'
+    DDQN = 'DDQN'
 
 
 def all_algorithms() -> List[Algorithm]:
     return [
-        Algorithm.DDPG
+        Algorithm.DDPG,
+        Algorithm.DDQN
     ]
 
 

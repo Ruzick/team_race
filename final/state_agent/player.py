@@ -78,7 +78,7 @@ class Team:
         features = state_to_tensor(self.team, player_state, opponent_state,
                                    soccer_state)
         p1_accel, p1_steer, p1_brake, p2_accel, p2_steer, p2_brake = self.model(features)
-        return [
+        actions = [
             {
                 'acceleration': p1_accel,
                 'steer': p1_steer,
@@ -90,3 +90,4 @@ class Team:
                 'brake': p2_brake,
             },
         ]
+        return actions

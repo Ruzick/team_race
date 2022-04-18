@@ -2,6 +2,7 @@ import argparse
 
 from trainer.algorithm import (Algorithm, AlgorithmImpl, all_algorithms)
 from trainer.ddpg import DDPG
+from trainer.ddqn import DDQN
 
 LOG_DIR = 'log/'
 
@@ -14,6 +15,8 @@ VIDEO_EPOCHS_INTERVAL = 0
 def get_impl(algorithm: Algorithm) -> AlgorithmImpl:
     if algorithm is Algorithm.DDPG:
         return DDPG()
+    if algorithm is Algorithm.DDQN:
+        return DDQN()
 
     raise NotImplementedError(f'Algorithm {algorithm} is not yet implemented')
 
