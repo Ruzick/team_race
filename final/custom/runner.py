@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from collections import namedtuple
+import pystk
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
@@ -168,7 +169,7 @@ class Match:
         return t1 < timeout, t2 < timeout
 
     def run(self, team1, team2, num_player=1, max_frames=MAX_FRAMES, max_score=3, record_fn=None, timeout=1e10,
-            initial_ball_location=[0, 0], initial_ball_velocity=[0, 0], verbose=False):
+            initial_ball_location=[0, 0], initial_ball_velocity=[0, 0], verbose=False, data_callback=None):
         RaceConfig = self._pystk.RaceConfig
 
         logging.info('Creating teams')
@@ -202,7 +203,7 @@ class Match:
         race.step()
 
         state = self._pystk.WorldState()
-        state.update()
+        state.update() 
         state.set_ball_location((initial_ball_location[0], 1, initial_ball_location[1]),
                                 (initial_ball_velocity[0], 0, initial_ball_velocity[1]))
 
@@ -215,9 +216,28 @@ class Match:
             team2_state = [to_native(p) for p in state.players[1::2]]
             soccer_state = to_native(state.soccer)
             team1_images = team2_images = None
-            if self._use_graphics:
-                team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)]
-                team2_images = [np.array(race.render_data[i].image) for i in range(1, len(race.render_data), 2)]
+
+
+
+            #Set up camera 
+            proj = np.array(state.players[0].camera.projection).T
+            view = np.array(state.players[0].camera.view).T
+            aim_point_image = self._to_image(pystk.Soccer.ball, proj, view)
+            if data_callback is not None:
+                data_callback(t, np.array(self.k.render_data[0].image), aim_point_image)
+
+
+
+
+
+            #if self._use_graphics:
+            #    team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] #odd players in the first team 
+            #   team2_images = [np.array(race.render_data[i].image) for i in range(1, len(race.render_data), 2)] #even players in the second team 
+
+
+
+
+        
 
             # Have each team produce actions (in parallel)
             if t1_can_act:
@@ -268,6 +288,11 @@ class Match:
     def wait(self, x):
         return x
 
+    @staticmethod
+    def _to_image(x, proj, view):
+        p = proj @ view @ np.array(list(x) + [1])
+        return np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -280,6 +305,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--record_state', help="Do you want to pickle the state?")
     parser.add_argument('-f', '--num_frames', default=1200, type=int, help="How many steps should we play for?")
     parser.add_argument('-p', '--num_players', default=2, type=int, help="Number of players per team")
+    parser.add_argument('-n', '--n_images', default=10000, type=int)
     parser.add_argument('-m', '--max_score', default=3, type=int, help="How many goal should we play to?")
     parser.add_argument('-j', '--parallel', type=int, help="How many parallel process to use?")
     parser.add_argument('--ball_location', default=[0, 0], type=float, nargs=2, help="Initial xy location of ball")
@@ -305,10 +331,25 @@ if __name__ == '__main__':
 
         # Start the match
         match = Match(use_graphics=team1.agent_type == 'image' or team2.agent_type == 'image')
+
+
+        def collect(_, im, pt): #can use this as is for data collection 
+            from PIL import Image
+            from os import path
+            global n
+            id = n if n < args.n_images else np.random.randint(0, n + 1)
+            if id < args.n_images:
+                fn = path.join(args.output, TRACK_NAME + '_%05d' % id)
+                Image.fromarray(im).save(fn + '.png')
+                with open(fn + '.csv', 'w') as f:
+                    f.write('%0.1f,%0.1f' % tuple(pt))
+            n += 1
+
+
         try:
             result = match.run(team1, team2, args.num_players, args.num_frames, max_score=args.max_score,
                                initial_ball_location=args.ball_location, initial_ball_velocity=args.ball_velocity,
-                               record_fn=recorder)
+                               record_fn=recorder, data_callback=collect)
         except MatchException as e:
             print('Match failed', e.score)
             print(' T1:', e.msg1)
