@@ -63,4 +63,4 @@ class Team:
                  steer:        float -1..1 steering angle
         """
         # TODO: Change me. I'm just cruising straight
-        return [dict(acceleration=1, steer=0)] * self.num_players
+        return [dict(acceleration=1, steer=0.6)] * self.num_players
