@@ -70,9 +70,9 @@ def state_to_tensor(team_id: int,
 
     features_tensor = torch.cat(
         [
-            torch.tensor([team_id], dtype=torch.float32),
-            *goal_tensors,
-            *kart_tensors,
+            torch.tensor([team_id], dtype=torch.float32),  # 1 dim
+            *goal_tensors,  # 2 goals * (angle, dist) -> 4 dim
+            *kart_tensors,  # 4 players * (angle, dist) -> 8 dim
         ])
 
     return features_tensor

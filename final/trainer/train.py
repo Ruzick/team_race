@@ -3,6 +3,7 @@ import argparse
 from trainer.algorithm import (Algorithm, AlgorithmImpl, all_algorithms)
 from trainer.ddpg import DDPG
 from trainer.ddqn import DDQN
+from trainer.human import HUMAN
 
 LOG_DIR = 'log/'
 
@@ -17,6 +18,8 @@ def get_impl(algorithm: Algorithm) -> AlgorithmImpl:
         return DDPG()
     if algorithm is Algorithm.DDQN:
         return DDQN()
+    if algorithm is Algorithm.HUMAN:
+        return HUMAN()
 
     raise NotImplementedError(f'Algorithm {algorithm} is not yet implemented')
 
