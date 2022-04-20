@@ -16,8 +16,8 @@ class HumanModel(nn.Module):
         input_tensor = torch.atleast_2d(input_tensor.to(self.device))
 
         output_tensor: Tensor = torch.tensor([
-            1., -1 * input_tensor[3].item(), 0.,
-            1., -1 * input_tensor[5].item(), 0.,
+            1., -1 * float(input_tensor[5].item()), 0.,
+            1., -1 * float(input_tensor[7].item()), 0.,
         ], dtype=torch.float32)
 
         return torch.squeeze(output_tensor).to(original_device)
