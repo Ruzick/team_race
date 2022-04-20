@@ -2,9 +2,11 @@ import logging
 import numpy as np
 from collections import namedtuple
 import pystk
+from os import makedirs
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
+DATASET_PATH = 'ff_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 
@@ -222,22 +224,22 @@ class Match:
             #Set up camera 
             proj = np.array(state.players[0].camera.projection).T
             view = np.array(state.players[0].camera.view).T
-            aim_point_image = self._to_image(pystk.Soccer.ball, proj, view)
-            if data_callback is not None:
-                data_callback(t, np.array(self.k.render_data[0].image), aim_point_image)
 
 
+            v = view @ np.array(list(state.soccer.ball.location) + [1])
+            if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) >0:
+                print('in front')
+                p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
+                aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
+                if aim_point_image[0]<1 and aim_point_image[1]<1:
+                    data_callback(np.array(race.render_data[0].image), aim_point_image)
+            else:
+                print('behind')
 
-
-
+    
             #if self._use_graphics:
-            #    team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] #odd players in the first team 
+            #   team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] #odd players in the first team 
             #   team2_images = [np.array(race.render_data[i].image) for i in range(1, len(race.render_data), 2)] #even players in the second team 
-
-
-
-
-        
 
             # Have each team produce actions (in parallel)
             if t1_can_act:
@@ -303,6 +305,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description="Play some Ice Hockey. List any number of players, odd players are in team 1, even players team 2.")
     parser.add_argument('-r', '--record_video', help="Do you want to record a video?")
     parser.add_argument('-s', '--record_state', help="Do you want to pickle the state?")
+    parser.add_argument('-o', '--output', default=DATASET_PATH)
     parser.add_argument('-f', '--num_frames', default=1200, type=int, help="How many steps should we play for?")
     parser.add_argument('-p', '--num_players', default=2, type=int, help="Number of players per team")
     parser.add_argument('-n', '--n_images', default=10000, type=int)
@@ -332,17 +335,22 @@ if __name__ == '__main__':
         # Start the match
         match = Match(use_graphics=team1.agent_type == 'image' or team2.agent_type == 'image')
 
+        try:
+            makedirs(args.output)
+        except OSError:
+            pass
 
-        def collect(_, im, pt): #can use this as is for data collection 
+        n=1
+        def collect(im, pt): #can use this as is for data collection 
             from PIL import Image
             from os import path
             global n
-            id = n if n < args.n_images else np.random.randint(0, n + 1)
-            if id < args.n_images:
-                fn = path.join(args.output, TRACK_NAME + '_%05d' % id)
-                Image.fromarray(im).save(fn + '.png')
-                with open(fn + '.csv', 'w') as f:
-                    f.write('%0.1f,%0.1f' % tuple(pt))
+            #id = n if n < args.n_images else np.random.randint(0, n + 1)
+            #if id < args.n_images:
+            fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
+            Image.fromarray(im).save(fn + '.png')
+            with open(fn + '.csv', 'w') as f:
+                f.write('%0.1f,%0.1f' % tuple(pt))
             n += 1
 
 

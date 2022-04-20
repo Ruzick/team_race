@@ -1,15 +1,15 @@
-from . import runner, utils
+from . import Data, utils
 
 # TODO: Wrap TeamRunner and Team in ray if possible
 try:
     import ray
 
     @ray.remote
-    class RayMatch(runner.Match):
+    class RayMatch(Data.Match):
         pass
 
     @ray.remote
-    class RayTeamRunner(runner.TeamRunner):
+    class RayTeamRunner(Data.TeamRunner):
         pass
 
     @ray.remote
