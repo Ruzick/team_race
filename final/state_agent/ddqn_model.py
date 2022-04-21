@@ -16,7 +16,7 @@ class DQNModel(nn.Module):
         super().__init__()
         # TODO: Choose a decent network architecture
         self.network = torch.nn.Sequential(
-            torch.nn.Linear(21, 32),
+            torch.nn.Linear(20, 32),
             torch.nn.ReLU(),
             torch.nn.Linear(32, 16),
             torch.nn.ReLU(),
@@ -38,6 +38,9 @@ class DQNModel(nn.Module):
         is_blue = input_tensor[:, 0] == 1
         if self.flip_for_blue:
             input_tensor = self.flip_input_for_blue(input_tensor, is_blue)
+
+        # Remove first component of state (the team) since it is not needed
+        input_tensor = input_tensor[:, 1:]
 
         network_output: Tensor = self.network(input_tensor)
         output_tensor = network_output
@@ -82,6 +85,10 @@ class DQNModel(nn.Module):
         should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
         should_flip_feature[1] = True  # ball to defence goal angle
         should_flip_feature[3] = True  # ball to attack goal angle
+        should_flip_feature[5] = True  # player 1 to ball angle
+        should_flip_feature[7] = True  # player 2 to ball angle
+        should_flip_feature[9] = True  # opponent 1 to ball angle
+        should_flip_feature[11] = True  # opponent 2 to ball angle
 
         flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
         return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)
@@ -100,6 +107,7 @@ class DQNPlayerModel(nn.Module):
             raise RuntimeError('This model does not support batching for forward')
 
         state_tensor = torch.atleast_2d(state_tensor)
+        is_blue = state_tensor[0, 0].item() != 0
 
         action: Tensor
         if self.training and torch.rand(1) < self.epsilon:
@@ -108,8 +116,8 @@ class DQNPlayerModel(nn.Module):
             action = self.get_best_action(self.dqn_model, state_tensor).squeeze()
 
         return torch.cat([
-            self.to_output_tensor(action[0:self.action_len // 2]),
-            self.to_output_tensor(action[self.action_len // 2:self.action_len]),
+            self.to_output_tensor(action[0:self.action_len // 2], is_blue),
+            self.to_output_tensor(action[self.action_len // 2:self.action_len], is_blue),
         ])
 
     def get_best_action(self, dqn_model: DQNModel, state_batch: Tensor) -> Tensor:
@@ -154,7 +162,7 @@ class DQNPlayerModel(nn.Module):
         return discretized_actions
 
     @staticmethod
-    def to_output_tensor(discrete_action_fragment: Tensor) -> Tensor:
+    def to_output_tensor(discrete_action_fragment: Tensor, is_blue: bool) -> Tensor:
         assert discrete_action_fragment.numel() == 4, \
             'Unexpected number of elements in action fragment'
 
@@ -175,5 +183,8 @@ class DQNPlayerModel(nn.Module):
             output_tensor[1] = -1
         elif discrete_action_fragment[1] == 1:
             output_tensor[1] = 1
+
+        if is_blue:
+            output_tensor[1] *= -1
 
         return output_tensor

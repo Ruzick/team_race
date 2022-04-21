@@ -13,7 +13,7 @@ class HumanModel(nn.Module):
 
     def forward(self, input_tensor) -> Tensor:
         original_device = input_tensor.device
-        input_tensor = torch.atleast_2d(input_tensor.to(self.device))
+        input_tensor = input_tensor.to(self.device)
 
         output_tensor: Tensor = torch.tensor([
             1., -1 * float(input_tensor[5].item()), 0.,
