@@ -19,19 +19,19 @@ RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 #args.output, TRACK_NAME + '_%05d' % n  .png or .csv
 
 class DetectionSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=20):
+    def __init__(self, dataset_path=DATASET_PATH, transform=dense_transforms.ToTensor(), min_size=20):
         from glob import glob
         from os import path
         self.files = []
         self.label = []
-        #fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
+        self.transform = transform
         for i in range(4):
-            for f in glob(path.join(dataset_path,  'i','.csv')):
+            for f in glob(path.join(dataset_path,  'i','*.csv')):
               self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
 
-            for im_f in glob(path.join(dataset_path, 'i','.png')):
+            for im_f in glob(path.join(dataset_path, 'i','*.png')): 
                 self.files.append(im_f)
-            self.transform = transform
+            
 
     def __len__(self):
         return len(self.files)
@@ -41,13 +41,14 @@ class DetectionSuperTuxDataset(Dataset):
         label = self.label[idx]
         b = self.files[idx]
         im = Image.open(b+'.png')
+        im = im.load()
         data = im, label
         if self.transform is not None:
             data = self.transform(*data)
         return data
 
 
-def load_detection_data(dataset_path, num_workers=0, batch_size=32, **kwargs):
+def load_detection_data(dataset_path=DATASET_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = DetectionSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
 
@@ -251,7 +252,7 @@ class Match:
         state.update() 
         state.set_ball_location((initial_ball_location[0], 1, initial_ball_location[1]),
                                 (initial_ball_velocity[0], 0, initial_ball_velocity[1]))
-
+        m = 0
         for it in range(max_frames):
             logging.debug('iteration {} / {}'.format(it, MAX_FRAMES))
             state.update()
@@ -265,7 +266,8 @@ class Match:
 
     
             #Set up camera players 0,1,2,3
-            for i in range(num_player):
+            num_kart=2 * num_player
+            for i in range(num_kart):
                 proj = np.array(state.players[i].camera.projection).T
                 view = np.array(state.players[i].camera.view).T
 
@@ -276,7 +278,8 @@ class Match:
 
                     aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
                     if aim_point_image[0]<1 and aim_point_image[1]<1:
-                        data_callback(np.array(race.render_data[i].image), aim_point_image,str(i))
+                        data_callback(np.array(race.render_data[i].image), aim_point_image,str(i)+str(m))
+            m +=1
                 # else:
                 #     print('behind')
 
