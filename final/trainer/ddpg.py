@@ -89,7 +89,7 @@ def train(args: argparse.Namespace):
     disable_grad(target_actor_model)
     disable_grad(target_critic_model)
 
-    critic_loss = torch.nn.MSELoss(reduction='sum')
+    critic_loss = torch.nn.MSELoss()
 
     actor_optimizer = torch.optim.Adam(actor_model.parameters())
     critic_optimizer = torch.optim.Adam(critic_model.parameters())
@@ -122,27 +122,16 @@ def train(args: argparse.Namespace):
 
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
 
-        actor_optimizer.zero_grad()
-        critic_optimizer.zero_grad()
-
         epoch_value_loss: Tensor = torch.tensor(0.)
         epoch_utility: Tensor = torch.tensor(0.)
 
-        n_epoch_samples: int = 0
+        i_epoch_batches: int = 0
+        num_epoch_samples: int = 0
         for state_batch, action_batch, reward_batch, next_state_batch in data_loader:
             state_batch: Tensor
             action_batch: Tensor
             reward_batch: Tensor
             next_state_batch: Tensor
-
-            n_batch_samples = min(state_batch.size(0), args.max_epoch_samples - n_epoch_samples)
-            if n_batch_samples <= 0:
-                break
-            if n_batch_samples < state_batch.size(0):
-                state_batch = state_batch[:n_batch_samples]
-                action_batch = action_batch[:n_batch_samples]
-                reward_batch = reward_batch[:n_batch_samples]
-                next_state_batch = next_state_batch[:n_batch_samples]
 
             value_input_actual_action = torch.cat((state_batch, action_batch), dim=-1)
             value_batch_actual_action: Tensor = critic_model(value_input_actual_action)
@@ -162,18 +151,23 @@ def train(args: argparse.Namespace):
             state_value_loss: Tensor = critic_loss(approx_value_actual_action,
                                                    value_batch_actual_action)
 
+            actor_optimizer.zero_grad()
+            critic_optimizer.zero_grad()
+            state_value_loss.backward()
+            value_batch_pred_action.mean().backward()
+            actor_optimizer.step()
+            critic_optimizer.step()
+
             epoch_value_loss += state_value_loss
-            epoch_utility += value_batch_pred_action.sum()
+            epoch_utility += value_batch_pred_action.mean()
 
-            n_epoch_samples += state_batch.size(0)
+            i_epoch_batches += 1
+            num_epoch_samples += state_batch.size(0)
+            if num_epoch_samples >= args.max_epoch_samples:
+                break
 
-        epoch_value_loss /= n_epoch_samples
-        epoch_utility /= n_epoch_samples
-        epoch_value_loss.backward()
-        epoch_utility.backward()
-
-        actor_optimizer.step()
-        critic_optimizer.step()
+        epoch_value_loss /= i_epoch_batches
+        epoch_utility /= i_epoch_batches
 
         log(train_logger, epoch_value_loss, epoch_utility, i_epoch)
 
