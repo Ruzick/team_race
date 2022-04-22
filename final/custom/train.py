@@ -1,8 +1,8 @@
-from model import Detector, save_model, load_model
+from .model import Detector, save_model, load_model
 import torch
 import torch.utils.tensorboard as tb
 import numpy as np
-from .runner import load_data
+from .runner import load_detection_data
 from . import dense_transforms
 import random
 
@@ -61,7 +61,7 @@ def train(args):
 
     transform = dense_transforms.Compose([
         dense_transforms.RandomHorizontalFlip(),
-        dense_transforms.ColorJitter( 0.9, 0.9, 0.9, hue=hue),#)contrast=0.5, saturation=0.9, hue=0.1), ##low in contrast and brightness for colorjitter #changed from .5 to .2
+        # dense_transforms.ColorJitter( 0.9, 0.9, 0.9, hue=hue),#)contrast=0.5, saturation=0.9, hue=0.1), ##low in contrast and brightness for colorjitter #changed from .5 to .2
         dense_transforms.ToTensor()
         # dense_transforms.Normalize([0.2649056  ,0.26406983 ,0.2644049 ], [0.22418422, 0.22388573 ,0.22410716]) #[0.2649056  0.26406983 0.2644049 ] [0.22418422 0.22388573 0.22410716]
      ] )
@@ -81,20 +81,22 @@ def train(args):
     random.seed(33)
     np.random.seed(33)
 
+
     epoch = 0
     class_weights = args.list_o_w #[0.1160526, 0.7707894, 0.11736842] #detected ot not
     class_weights=torch.FloatTensor(class_weights).view(1,3,1,1).to(device)
     loss_all =[]
     # model = load_model().to(device)
-    if args.continue_training:
-        model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)), 'det.th')))
+    # if args.continue_training:
+    #     model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)), 'det.th')))
     model.train()
     for epoch in range(args.epochs):
         loss_= [ ]
-        for image, peak_loc  in load_data('ff_data',batch_size=batch_size,  num_workers = 1,transform= transform):
-
+        for image, peak_loc  in load_detection_data('ff_data',batch_size=batch_size,  num_workers = 1,transform= transform):
+            print(peak_loc)
             X = image.to(device)
             peak_pred  = model.detect(X)
+            print(peak_pred)
             peak_pred = peak_pred.to(device)
             peak_loc =( peak_loc).to(device)
             delta = args.delta
@@ -108,7 +110,7 @@ def train(args):
 
 
             #loggin
-            log(train_logger, image, peak_hm, peak_pred, global_step)
+            log(train_logger, image, peak_loc, peak_pred, global_step)
             train_logger.add_scalar('loss', np.mean(loss_), global_step)
 
            
@@ -119,9 +121,10 @@ def train(args):
             scheduler.step()
             mean_l = np.mean(loss_)
             global_step += 1
-        loss_all.append(mean_l)
+
+        loss_all.append( np.mean(loss_))
   
-        print(f'epoch {epoch} loss {mean_l } learning rate {scheduler.get_last_lr()[0]} ')
+        print(f'epoch {epoch} loss { np.mean(loss_)} learning rate {scheduler.get_last_lr()[0]} ')
         save_model(model)
 
     
@@ -144,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument('-hue', '--hue',type=float, help='hue', default=0.5)
     parser.add_argument('-cont', '--cont',type=float, help='cont', default=0.9)
     parser.add_argument('-sat', '--sat',type=float, help='sat', default=0.9)
-    parser.add_argument('-conti', '--continue_training',type=bool, help='sat', default=True)
+    parser.add_argument('-conti', '--continue_training',type=bool, help='sat', default=False)
     args = parser.parse_args()
 
     from os import path

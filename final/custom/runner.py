@@ -1,8 +1,12 @@
 import logging
+from PIL import Image
 import numpy as np
 from collections import namedtuple
 import pystk
 from os import makedirs
+from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms.functional as TF
+from . import dense_transforms
 
 from . import remote
 
@@ -11,38 +15,38 @@ MAX_FRAMES = 1000
 DATASET_PATH = 'ff_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
-from torch.utils.data import Dataset, DataLoader
-import torchvision.transforms.functional as TF
-from . import dense_transforms
 
-RESCUE_TIMEOUT = 30
-TRACK_OFFSET = 15
+#args.output, TRACK_NAME + '_%05d' % n  .png or .csv
 
-
-class SuperTuxDataset(Dataset):
-    def __init__(self, dataset_path=DATASET_PATH, transform=dense_transforms.ToTensor()):
-        from PIL import Image
+class DetectionSuperTuxDataset(Dataset):
+    def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=20):
         from glob import glob
         from os import path
-        self.data = []
+        self.files = []
+        self.label = []
+
         for f in glob(path.join(dataset_path, '*.csv')):
-            i = Image.open(f.replace('.csv', '.png'))
-            i.load()
-            self.data.append((i, np.loadtxt(f, dtype=np.float32, delimiter=',')))
+          self.label.append(f)
+        for im_f in glob(path.join(dataset_path, '*.png')):
+            self.files.append(im_f.replace('.png', ''))
         self.transform = transform
 
+
     def __len__(self):
-        return len(self.data)
+        return len(self.files)
 
     def __getitem__(self, idx):
-        data = self.data[idx]
-        data = self.transform(*data)
-        return data
+        import numpy as np
+        label = np.load(self.label[idx])
+        im = Image.open(self.files[idx])
+        
+        return self.transform([im, label])
 
 
-def load_data(dataset_path=DATASET_PATH, transform=dense_transforms.ToTensor(), num_workers=0, batch_size=128):
-    dataset = SuperTuxDataset(dataset_path, transform=transform)
+def load_detection_data(dataset_path, num_workers=0, batch_size=32, **kwargs):
+    dataset = DetectionSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
+
 
 
 
@@ -269,7 +273,6 @@ class Match:
                     aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
                     if aim_point_image[0]<1 and aim_point_image[1]<1:
                         data_callback(np.array(race.render_data[i].image), aim_point_image)
-
                 # else:
                 #     print('behind')
 

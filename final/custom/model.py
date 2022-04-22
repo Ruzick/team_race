@@ -179,7 +179,7 @@ if __name__ == '__main__':
     Shows detections of your detector
     """
     from .runner import SuperTuxDataset
-    dataset = SuperTuxDataset('ff_data')
+    dataset = SuperTuxDataset('ff_data/train/')
     import torchvision.transforms.functional as TF
     from pylab import show, subplots
     import matplotlib.patches as patches
