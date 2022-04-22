@@ -61,8 +61,12 @@ class ActorModel(nn.Module):
                                                      self.noise_std_dev * torch.ones(6)
                                                      ).to(self.device))
 
-        noisy_output = torch.maximum(noisy_output, torch.tensor([0., -1., 0., 0., -1., 0.]))
-        noisy_output = torch.minimum(noisy_output, torch.tensor([1., 1., 1., 1., 1., 1.]))
+        noisy_output = torch.maximum(
+            noisy_output,
+            torch.tensor([0., -1., 0., 0., -1., 0.]).to(noisy_output.device))
+        noisy_output = torch.minimum(
+            noisy_output,
+            torch.tensor([1., 1., 1., 1., 1., 1.]).to(noisy_output.device))
         return noisy_output
 
     @staticmethod

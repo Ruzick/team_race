@@ -23,6 +23,7 @@ TAU = 0.001
 ACTOR_LR = 0.01
 CRITIC_LR = 0.01
 NOISE_STANDARD_DEVIATION = 0.1
+MAX_FRAMES = 500
 
 
 class DDPG(AlgorithmImpl):
@@ -31,6 +32,7 @@ class DDPG(AlgorithmImpl):
         subparser.add_argument('-alr', '--actor-learning-rate', type=float, default=ACTOR_LR)
         subparser.add_argument('-clr', '--critic-learning-rate', type=float, default=CRITIC_LR)
         subparser.add_argument('-mds', '--max-dataset-size', type=int, default=MAX_DATASET_SIZE)
+        subparser.add_argument('-f', '--num-frames', type=int, default=MAX_FRAMES)
         subparser.add_argument('--tau', type=float, default=TAU)
         subparser.add_argument('-N', '--max-epoch-samples', type=int, default=MAX_EPOCH_SAMPLES)
         subparser.add_argument('-ansd', '--actor-noise-standard-deviation', type=float,
@@ -105,12 +107,13 @@ def train(args: argparse.Namespace):
         dataset = merge_datasets(
             dataset,
             generate_data(match, 'jurgen_agent', actor_model, 1, reward_criteria,
-                          use_red_data=False, use_blue_data=True,
+                          use_red_data=False, use_blue_data=True, num_frames=args.num_frames,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
             generate_data(match, actor_model, 'jurgen_agent', 1, reward_criteria,
-                          use_red_data=True, use_blue_data=False,
+                          use_red_data=True, use_blue_data=False, num_frames=args.num_frames,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
             generate_data(match, actor_model, actor_model, 1, reward_criteria,
+                          num_frames=args.num_frames,
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
         )
         dataset.discard_to_max_size(args.max_dataset_size)
