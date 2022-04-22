@@ -174,26 +174,26 @@ def load_model():
 #         ax.axis('off')
 #     show()
 
-# if __name__ == '__main__':
-#     """
-#     Shows detections of your detector
-#     """
-#     from .utils import DetectionSuperTuxDataset
-#     dataset = DetectionSuperTuxDataset('drive_data/train/')
-#     import torchvision.transforms.functional as TF
-#     from pylab import show, subplots
-#     import matplotlib.patches as patches
+if __name__ == '__main__':
+    """
+    Shows detections of your detector
+    """
+    from .runner import SuperTuxDataset
+    dataset = SuperTuxDataset('ff_data')
+    import torchvision.transforms.functional as TF
+    from pylab import show, subplots
+    import matplotlib.patches as patches
 
     
-#     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-#     fig, axs = subplots(3, 4)
-#     model = load_model()
-#     for i, ax in enumerate(axs.flat):
-#         im, puck = dataset[i]
-#         ax.imshow(TF.to_pil_image(im), interpolation=None)
-#         score, cx, cy= model.detect(im.to(device))
-#         print('x, y', cx, cy )
-#         ax.add_patch(patches.Circle((cx, cy), radius=max(2  / 2, 0.1), color='rgb'[0]))
-#         ax.axis('off')
-#     show()
+    fig, axs = subplots(3, 4)
+    model = load_model()
+    for i, ax in enumerate(axs.flat):
+        im, puck = dataset[i]
+        ax.imshow(TF.to_pil_image(im), interpolation=None)
+        score, cx, cy= model.detect(im.to(device))
+        print('x, y', cx, cy )
+        ax.add_patch(patches.Circle((cx, cy), radius=max(2  / 2, 0.1), color='rgb'[0]))
+        ax.axis('off')
+    show()
