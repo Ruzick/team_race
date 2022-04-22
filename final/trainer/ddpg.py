@@ -4,7 +4,7 @@ from typing import Optional
 
 import torch
 import torch.utils.tensorboard as tb
-from state_agent.model import ActorModel, CriticModel
+from state_agent.ddpg_model import ActorModel, CriticModel
 from state_agent.utils import copy_parameters, save_model
 from torch import Tensor
 from torch.jit import ScriptModule
@@ -100,6 +100,8 @@ def train(args: argparse.Namespace):
     for i_epoch in range(args.epochs):
         print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
 
+        actor_model.discretize_action = True
+        actor_model.use_noise = True
         dataset = merge_datasets(
             dataset,
             generate_data(match, 'jurgen_agent', actor_model, 1, reward_criteria,
@@ -112,6 +114,9 @@ def train(args: argparse.Namespace):
                           video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
         )
         dataset.discard_to_max_size(args.max_dataset_size)
+        actor_model.discretize_action = False
+        actor_model.use_noise = False
+
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
 
         actor_optimizer.zero_grad()

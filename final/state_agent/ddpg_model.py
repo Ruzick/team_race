@@ -23,6 +23,8 @@ class ActorModel(nn.Module):
         self.flip_for_blue = flip_for_blue
         self.device = device
         self.noise_std_dev = noise_std_dev
+        self.use_noise = False
+        self.discretize_action = False
 
     def forward(self, input_tensor: Tensor):
         original_device = input_tensor.device
@@ -39,11 +41,15 @@ class ActorModel(nn.Module):
                          * torch.tensor([1., 2., 1., 1., 2., 1.]).to(self.device)
                          - torch.tensor([0., 1., 0., 0., 1., 0.]).to(self.device))
 
-        if self.training:
+        if self.training and self.use_noise:
             output_tensor = self.apply_noise(output_tensor)
 
         if self.flip_for_blue:
             output_tensor = self.flip_output_for_blue(output_tensor, is_blue)
+
+        if not self.training or self.discretize_action:
+            output_tensor[:, 2] = torch.round(output_tensor[:, 2])
+            output_tensor[:, 5] = torch.round(output_tensor[:, 5])
 
         return torch.unsqueeze(torch.squeeze(output_tensor), -1).to(original_device)
 
@@ -51,8 +57,13 @@ class ActorModel(nn.Module):
         if self.noise_std_dev <= 0.:
             return output_tensor
 
-        return (output_tensor
-                + torch.normal(torch.zeros(6), self.noise_std_dev * torch.ones(6)).to(self.device))
+        noisy_output = (output_tensor + torch.normal(torch.zeros(6),
+                                                     self.noise_std_dev * torch.ones(6)
+                                                     ).to(self.device))
+
+        noisy_output = torch.maximum(noisy_output, torch.tensor([0., -1., 0., 0., -1., 0.]))
+        noisy_output = torch.minimum(noisy_output, torch.tensor([1., 1., 1., 1., 1., 1.]))
+        return noisy_output
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
@@ -61,17 +72,25 @@ class ActorModel(nn.Module):
         should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
         should_flip_feature[1] = True  # ball to defence goal angle
         should_flip_feature[3] = True  # ball to attack goal angle
+        should_flip_feature[5] = True  # player 1 to ball angle
+        should_flip_feature[7] = True  # player 2 to ball angle
+        should_flip_feature[9] = True  # opponent 1 to ball angle
+        should_flip_feature[11] = True  # opponent 2 to ball angle
 
         flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
         return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)
 
     @staticmethod
-    def flip_output_for_blue(output_tensor: Tensor, _: Tensor) -> Tensor:
+    def flip_output_for_blue(output_tensor: Tensor, is_blue: Tensor) -> Tensor:
         assert output_tensor.size(-1) == 6, \
             f'Output tensor size {output_tensor.shape} does not match expected size'
 
-        # Currently logic does not require any flipping for output
-        return output_tensor
+        should_flip_feature = torch.zeros(output_tensor.size(-1), dtype=torch.bool)
+        should_flip_feature[1] = True  # player 1 steer
+        should_flip_feature[4] = True  # player 2 steer
+
+        flip_multiple = torch.where(should_flip_feature, -1., 1.).to(output_tensor.device)
+        return torch.where(is_blue[:, None], output_tensor * flip_multiple[None, :], output_tensor)
 
 
 class CriticModel(nn.Module):

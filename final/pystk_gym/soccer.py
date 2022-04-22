@@ -3,8 +3,8 @@ import gym
 from gym import spaces
 from gym.core import ObsType, ActType
 from gym.utils import seeding
-from utils import StateRecorder, VideoRecorder, AIRunner, to_native
-from typing import Optional
+from .utils import StateRecorder, VideoRecorder, AIRunner, to_native
+from typing import Any, Dict, Optional
 
 
 class STKSoccer(gym.Env):
@@ -99,7 +99,7 @@ class STKSoccer(gym.Env):
         # Renderer
         self.recorder = None
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = {}):
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Dict[str, Any]:
         """ Resets the environment to an initial state and returns an initial
         observation.
 
@@ -107,6 +107,9 @@ class STKSoccer(gym.Env):
             options = {"teams": [[{"is_ai": False, "kart": "tux"}, ...], [...], ...}}
 
         """
+        if options is None:
+            options = {}
+
         # Todo:  Backfill teams with AI if not specified?
         opt_n_teams = len(options["teams"])
         if opt_n_teams != self.n_teams:
@@ -152,7 +155,7 @@ class STKSoccer(gym.Env):
 
         return self._next_observation()
 
-    def step(self, action: ActType):
+    def step(self, action: ActType) -> Dict[str, Any]:
         """ Run one timestep of the environment's dynamics.
         """
         if len(action) != (self.active_players):
@@ -220,7 +223,7 @@ class STKSoccer(gym.Env):
         if state:
             self.recorder = self.recorder & StateRecorder(state)
 
-    def _next_observation(self):
+    def _next_observation(self) -> Dict[str, Any]:
         # Todo:  Option to vectorize state
         self.state.update()
 
