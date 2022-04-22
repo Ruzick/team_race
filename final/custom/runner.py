@@ -24,23 +24,27 @@ class DetectionSuperTuxDataset(Dataset):
         from os import path
         self.files = []
         self.label = []
+        #fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
+        for i in range(4):
+            for f in glob(path.join(dataset_path,  'i','.csv')):
+              self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
 
-        for f in glob(path.join(dataset_path, '*.csv')):
-          self.label.append(f)
-        for im_f in glob(path.join(dataset_path, '*.png')):
-            self.files.append(im_f.replace('.png', ''))
-        self.transform = transform
-
+            for im_f in glob(path.join(dataset_path, 'i','.png')):
+                self.files.append(im_f)
+            self.transform = transform
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
         import numpy as np
-        label = np.load(self.label[idx])
-        im = Image.open(self.files[idx])
-        
-        return self.transform([im, label])
+        label = self.label[idx]
+        b = self.files[idx]
+        im = Image.open(b+'.png')
+        data = im, label
+        if self.transform is not None:
+            data = self.transform(*data)
+        return data
 
 
 def load_detection_data(dataset_path, num_workers=0, batch_size=32, **kwargs):
@@ -272,7 +276,7 @@ class Match:
 
                     aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
                     if aim_point_image[0]<1 and aim_point_image[1]<1:
-                        data_callback(np.array(race.render_data[i].image), aim_point_image)
+                        data_callback(np.array(race.render_data[i].image), aim_point_image,str(i))
                 # else:
                 #     print('behind')
 
@@ -330,26 +334,6 @@ class Match:
     def wait(self, x):
         return x
 
-    # @staticmethod
-    # def _to_image(x, proj, view):
-    #     p = proj @ view @ np.array(list(x) + [1])
-    #     return np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
-
-    #              #Set up camera player 1
-    #         proj = np.array(state.players[0].camera.projection).T
-    #         view = np.array(state.players[0].camera.view).T
-
-    #         v = view @ np.array(list(state.soccer.ball.location) + [1])
-    #         if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) >0:
-    #             print('in front')
-    #             p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
-
-    #             aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
-    #             if aim_point_image[0]<1 and aim_point_image[1]<1:
-    #                 data_callback(np.array(race.render_data[0].image), aim_point_image)
-    # #         else:
-    #             print('behind')
-
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -396,13 +380,13 @@ if __name__ == '__main__':
             pass
 
         n=1
-        def collect(im, pt): #can use this as is for data collection 
+        def collect(im, pt,player): #can use this as is for data collection 
             from PIL import Image
             from os import path
             global n
             #id = n if n < args.n_images else np.random.randint(0, n + 1)
             #if id < args.n_images:
-            fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
+            fn = path.join(args.output, player)#)TRACK_NAME + '_%05d' % n)
             Image.fromarray(im).save(fn + '.png')
             with open(fn + '.csv', 'w') as f:
                 f.write('%0.1f,%0.1f' % tuple(pt))

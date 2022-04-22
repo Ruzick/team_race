@@ -92,7 +92,7 @@ def train(args):
     model.train()
     for epoch in range(args.epochs):
         loss_= [ ]
-        for image, peak_loc  in load_detection_data('ff_data',batch_size=batch_size,  num_workers = 1,transform= transform):
+        for image, peak_loc  in load_detection_data('ff_data/train',batch_size=64,  num_workers = 1,transform= transform):
             print(peak_loc)
             X = image.to(device)
             peak_pred  = model.detect(X)
