@@ -60,9 +60,8 @@ def _get_player_to_ball_dist_rewards(match_data: List[dict], team_id: int) -> Te
         for frame_data in match_data
     ], dtype=torch.float32)
 
-    # Divide by a constant so that it's not too big
-    rewards = rewards[1:]
-    rewards = (rewards - rewards.mean()) / rewards.std()
+    # Just experimenting
+    rewards = rewards[1:] - rewards[:-1]
     return rewards
 
 
