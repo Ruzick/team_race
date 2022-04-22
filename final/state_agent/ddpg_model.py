@@ -48,7 +48,9 @@ class ActorModel(nn.Module):
             output_tensor = self.flip_output_for_blue(output_tensor, is_blue)
 
         if not self.training or self.discretize_action:
+            output_tensor[:, 0] = torch.floor(output_tensor[:, 0] * 2.999) / 2
             output_tensor[:, 2] = torch.round(output_tensor[:, 2])
+            output_tensor[:, 3] = torch.floor(output_tensor[:, 3] * 2.999) / 2
             output_tensor[:, 5] = torch.round(output_tensor[:, 5])
 
         return torch.unsqueeze(torch.squeeze(output_tensor), -1).to(original_device)
