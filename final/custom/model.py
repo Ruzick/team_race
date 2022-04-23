@@ -46,7 +46,7 @@ class Detector(torch.nn.Module):
         def forward(self, x):
             return F.relu(self.c1(x))
 
-    def __init__(self, layers=[16, 32, 64, 128], n_class=1, kernel_size=3, use_skip=True):
+    def __init__(self, layers=[16, 32, 64, 128], n_class=2, kernel_size=3, use_skip=True):
         """
            Your code here.
            Setup your detection network
@@ -112,24 +112,37 @@ class Detector(torch.nn.Module):
                  in order to improve this. The input data only contains information of when the puck is in front of the kart.
 
         """
-        hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 1 x h x w )
-        detection = True
+        hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 2 x h x w ) classes are puck and player
+        puck_detection = True
+        all_lists= []
+        for channel in range (hm.size(dim= 1)):
+            peaks_per_object = []
+            current_list = extract_peak(hm[0][channel], max_det = 30)
+            if len(current_list) == 0:
+                if channel ==0:
+                    print("no object detected", current_list,channel)
+                    puck_detection = False
+                    c_x = 0
+                    c_y = 0
+                    current_list =[0,0,0]
+                #puck is somewhere in the front but not caught by segmentation
+            else: 
+            #get the max peak value, so it doenst think something else is a puck
+                print("puck detected", current_list, channel)
+                puck = max(current_list, key=lambda x: x[0])
+                # c_x = puck[1]
+                # c_y = puck[2]
+                # current_list =[0,c_x,c_y]
+            for each_object in current_list:
 
-        current_list = extract_peak(hm[0], max_det = 30) #should contain one peak
-        if len(current_list) == 0:
-            print("puck not detected", current_list)
-            detection = False
-            puck = [0,0,0]
-            #puck is somewhere in the front but not caught by segmentation
-        else: 
-        #get the max peak value, so it doenst think something else is a puck
-            print("puck detected", current_list)
-            puck = max(current_list, key=lambda x: x[0])
-            c_x = puck[1]
-            c_y = puck[2]
+                peaks_per_object.append( puck_detection,int(each_object[1]),int(each_object[2])) 
+
+
+            all_lists.append(peaks_per_object) #contains both 
         print(puck)
 
-        return  puck[1], puck[2]
+        return  all_lists
+
 
 def save_model(model):
     from torch import save
