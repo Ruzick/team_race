@@ -1,7 +1,6 @@
-
+import numpy as np
 class Team:
     agent_type = 'image'
-
 
     def __init__(self):
         """
@@ -27,7 +26,8 @@ class Team:
         self.team, self.num_players = team, num_players
         return ['tux'] * num_players
 
-    def act(self, player_state, player_image):
+    #def act(self, player_state, player_image):
+    def act(self, player_state, player_image, kart, aim, current_vel):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -63,4 +63,23 @@ class Team:
                  steer:        float -1..1 steering angle
         """
         # TODO: Change me. I'm just cruising straight
-        return [dict(acceleration=1, steer=0.6)] * self.num_players
+        
+        # Compute accelerate
+        if np.linalg.norm(current_vel) < 10:
+          acceleration = 1.0 
+        else:
+          acceleration = 0
+
+        #if kart is not in view lower the speed and look around 
+        if kart == False:
+          steer = 1
+
+        #if kart is in view, follow the kart similar to HW5
+
+        else:
+          steer_angle = 2 * aim[0]
+          steer = np.clip(steer_angle, -1, 1)
+        
+
+
+        return [{'acceleration':acceleration, 'steer':steer}] * self.num_players
