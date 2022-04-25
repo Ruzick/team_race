@@ -1,7 +1,9 @@
 import itertools
 from typing import List
-from torch import Tensor, nn
+
 import torch
+from torch import Tensor, nn
+from torch.jit import ScriptModule
 
 
 DEFAULT_DEVICE: torch.device = torch.device('cpu')
@@ -95,7 +97,7 @@ class DQNModel(nn.Module):
 
 
 class DQNPlayerModel(nn.Module):
-    def __init__(self, dqn_model: DQNModel, epsilon: float = EPSILON):
+    def __init__(self, dqn_model: ScriptModule, epsilon: float = EPSILON):
         super().__init__()
         self.dqn_model = dqn_model
         self.epsilon = epsilon
@@ -109,31 +111,31 @@ class DQNPlayerModel(nn.Module):
         state_tensor = torch.atleast_2d(state_tensor)
         is_blue = state_tensor[0, 0].item() != 0
 
-        action: Tensor
+        # action: Tensor
         if self.training and torch.rand(1) < self.epsilon:
             action = self.get_random_action()
         else:
-            action = self.get_best_action(self.dqn_model, state_tensor).squeeze()
+            action = self.get_best_action(state_tensor).squeeze()
 
         return torch.cat([
             self.to_output_tensor(action[0:self.action_len // 2], is_blue),
             self.to_output_tensor(action[self.action_len // 2:self.action_len], is_blue),
         ])
 
-    def get_best_action(self, dqn_model: DQNModel, state_batch: Tensor) -> Tensor:
+    def get_best_action(self, state_batch: Tensor) -> Tensor:
         dqn_outputs: List[Tensor] = []
         for discretized_action in self.discretized_actions:
             broadcasted_discretized_action = torch.broadcast_to(
                 discretized_action, (state_batch.size(0), discretized_action.numel()))
             dqn_input = torch.cat([state_batch, broadcasted_discretized_action], dim=-1)
-            dqn_output: Tensor = dqn_model(dqn_input)
+            dqn_output: Tensor = self.dqn_model.forward(dqn_input)
             dqn_outputs.append(dqn_output)
 
         best_action_indices = torch.argmax(torch.stack(dqn_outputs), dim=0)
         return torch.stack(self.discretized_actions)[best_action_indices]
 
     def get_random_action(self) -> Tensor:
-        index: int = torch.randint(len(self.discretized_actions), (1,)).item()
+        index: int = int(torch.randint(len(self.discretized_actions), (1,)).item())
         return self.discretized_actions[index]
 
     @staticmethod
