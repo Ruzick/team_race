@@ -5,8 +5,11 @@ import torch
 from state_agent.human_model import HumanModel
 from state_agent.utils import save_model
 from torch.jit import ScriptModule
+from tournament.runner import Match
 
 from trainer.algorithm import AlgorithmImpl
+from trainer.data import generate_data
+from trainer.reward import RewardCriteria, RewardCriterion
 
 LOG_DIR = 'log/'
 MAX_EPOCH_SAMPLES = 1000
@@ -39,4 +42,14 @@ def train(_: argparse.Namespace):
     )
 
     human_model: ScriptModule = human_model_generator().to(device)
+
+    match = Match()
+
+    reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST,
+                                     RewardCriterion.SCORE)
+
+    generate_data(
+        match, human_model, human_model, 1, reward_criteria,
+        video_path='human-test.mp4')
+
     save_model(human_model)
