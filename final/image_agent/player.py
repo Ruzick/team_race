@@ -26,7 +26,7 @@ class Team:
         self.team, self.num_players = team, num_players
         return ['tux'] * num_players
 
-    def act(self, player_state, player_image):
+    def act(self, player_state, player_image, ball_location):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
