@@ -1,10 +1,13 @@
 from torch import Tensor, nn
 import torch
 
-from state_agent.utils import limit_period
-
 
 DEFAULT_DEVICE: torch.device = torch.device('cpu')
+
+
+def limit_period(angle: float):
+    # turn angle into -1 to 1
+    return angle - torch.floor(angle / 2 + 0.5) * 2
 
 
 class HumanModel(nn.Module):
