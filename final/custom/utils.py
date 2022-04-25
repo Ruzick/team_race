@@ -7,10 +7,10 @@ from torchvision.transforms import functional as F
 
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
-DATASET_PATH = 'image_data'
+
 
 class DenseSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path = DATASET_PATH , transform=dense_transforms.ToTensor()):
+    def __init__(self, dataset_path = 'image_data' , transform=dense_transforms.ToTensor()):
         from glob import glob
         from os import path
         self.files = []
@@ -30,9 +30,46 @@ class DenseSuperTuxDataset(Dataset):
             im, lbl = self.transform(im, lbl)
         return im, lbl
 
-def load_dense_data(dataset_path=DATASET_PATH, num_workers=0, batch_size=32, **kwargs):
+def load_dense_data(dataset_path='image_data', num_workers=0, batch_size=32, **kwargs):
     dataset = DenseSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
+
+
+from custom import dense_transforms
+DATASET_PATH = 'ff_data'
+class DetectionSuperTuxDataset(Dataset):
+    def __init__(self, dataset_path='ff_data', transform=dense_transforms.ToTensor(), min_size=20):
+        from glob import glob
+        from os import path
+        self.files = []
+        self.label = []
+        self.transform = transform
+
+        for f in glob(path.join(dataset_path,'*.csv')):
+          self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
+
+        for im_f in glob(path.join(dataset_path,'*.png')):
+            self.files.append(im_f)
+          
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        import numpy as np
+        label = self.label[idx]
+        b = self.files[idx]
+        im = Image.open(b)
+        data = im, label
+        if self.transform is not None:
+            data = self.transform(*data)
+        return data
+
+
+def load_detection_data(dataset_path='ff_data', num_workers=0, batch_size=32, **kwargs):
+    dataset = DetectionSuperTuxDataset(dataset_path, **kwargs)
+    return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
+
 
 
 class Team(IntEnum):
