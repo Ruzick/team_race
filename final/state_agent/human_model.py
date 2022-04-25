@@ -1,6 +1,8 @@
 from torch import Tensor, nn
 import torch
 
+from state_agent.utils import limit_period
+
 
 DEFAULT_DEVICE: torch.device = torch.device('cpu')
 
@@ -25,8 +27,11 @@ class HumanModel(nn.Module):
 
     @staticmethod
     def get_steering(input_tensor, i_player: int):
-        kart_to_ball_angle_index = 5 + 2 * i_player
-        kart_to_ball_angle = float(input_tensor[kart_to_ball_angle_index])
+        kart_angle_index = 5 + 3 * i_player
+        kart_to_ball_angle_index = kart_angle_index + 1
+        kart_to_ball_relative_angle = limit_period(float(
+            input_tensor[kart_angle_index] - input_tensor[kart_to_ball_angle_index]
+        ) / torch.pi)
 
         # is_blue = float(input_tensor[0]) != 0
         # ball_to_goal_angle_multiplier = -1. if is_blue else 1.
@@ -34,7 +39,7 @@ class HumanModel(nn.Module):
 
         steering_multiplier = 10000.
 
-        steer = steering_multiplier * kart_to_ball_angle
+        steer = steering_multiplier * kart_to_ball_relative_angle
         return steer
 
     @staticmethod
