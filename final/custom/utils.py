@@ -5,24 +5,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.transforms import functional as F
 
-from custom.runner import TRACK_NAME
-
-from . import dense_transforms
-TRACK_NAME = "icy_soccer_field"
-
-
-DATASET_PATH = 'image_data'
-from PIL import Image
-import numpy as np
-from enum import IntEnum
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-from torchvision.transforms import functional as F
-
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
-
-
 DATASET_PATH = 'image_data'
 
 class DenseSuperTuxDataset(Dataset):
@@ -30,13 +14,8 @@ class DenseSuperTuxDataset(Dataset):
         from glob import glob
         from os import path
         self.files = []
-        for im_f in glob(path.join(dataset_path, '*.png')):
-            # print(im_f.replace('.png', ''))
-            print(im_f.replace('_segmentation.png', '').replace('.png',''))
-
-
-            # print(im_f)
-            self.files.append(im_f.replace('_segmentation.png', '').replace('.png',''))
+        for im_f in glob(path.join(dataset_path, '*_segmentation.png')):
+            self.files.append(im_f.replace('_segmentation.png', ''))
         self.transform = transform
 
     def __len__(self):
@@ -44,13 +23,11 @@ class DenseSuperTuxDataset(Dataset):
 
     def __getitem__(self, idx):
         b = self.files[idx]
+        print(b)
         im = Image.open(b + '.png')
-        print(b+'png')
         lbl = Image.open(b + '_segmentation.png')
-        print(b + '_segmentation.png')
         if self.transform is not None:
             im, lbl = self.transform(im, lbl)
-          
         return im, lbl
 
 def load_dense_data(dataset_path=DATASET_PATH, num_workers=0, batch_size=32, **kwargs):
