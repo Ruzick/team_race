@@ -124,10 +124,12 @@ def generate_data(match: Match,
     else:
         team2_runner = TeamRunner(Team(team_or_dir2))
 
+    if video_path is not None:
+        print(f'Starting video recording to {video_path}')
     matches_data = [
-        play_match(match, team1_runner, team2_runner, video_path,
+        play_match(match, team1_runner, team2_runner, video_path if i_match == 0 else None,
                    num_frames, initial_ball_location, initial_ball_velocity)
-        for _ in range(num_matches)
+        for i_match in range(num_matches)
     ]
 
     red_matches_rewards: List[List[float]] = [[]]

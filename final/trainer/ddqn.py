@@ -22,6 +22,8 @@ GAMMA = 0.99
 TAU = 0.001
 LR = 0.01
 NOISE_STANDARD_DEVIATION = 0.1
+EPSILON = 0.1
+RANDOM_EPOCHS = 20
 
 
 class DDQN(AlgorithmImpl):
@@ -29,6 +31,8 @@ class DDQN(AlgorithmImpl):
         subparser.add_argument('-f', '--num-frames', type=int, default=None)
         subparser.add_argument('-g', '--gamma', type=float, default=GAMMA)
         subparser.add_argument('-lr', '--learning-rate', type=float, default=LR)
+        subparser.add_argument('-re', '--random-epochs', type=int, default=RANDOM_EPOCHS)
+        subparser.add_argument('-eps', '--epsilon', type=float, default=EPSILON)
         subparser.add_argument('-mds', '--max-dataset-size', type=int, default=MAX_DATASET_SIZE)
         subparser.add_argument('--tau', type=float, default=TAU)
         subparser.add_argument('-N', '--max-epoch-samples', type=int, default=MAX_EPOCH_SAMPLES)
@@ -101,6 +105,11 @@ def train(args: argparse.Namespace):
 
     for i_epoch in range(args.epochs):
         print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
+
+        if i_epoch < args.random_epochs:
+            dqn_player_model.epsilon = 1.
+        else:
+            dqn_player_model.epsilon = args.epsilon
 
         generated_dataset = generate_data(
             match, dqn_player_model, dqn_player_model, 1, reward_criteria,
