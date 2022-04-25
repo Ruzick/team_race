@@ -16,13 +16,13 @@ from trainer.reward import RewardCriteria, get_match_rewards
 class FramesDataset(Dataset):
     def __init__(self, transform=None):
         self.transform = transform
-        self.data: List[Tuple[Tensor, List[dict], float]] = []
+        self.data: List[Tuple[Tensor, List[dict], float, Tensor]] = []
 
     def add_data(self,
                  matches_data: List[List[dict]],
                  red_matches_rewards: List[List[float]],
                  blue_matches_rewards: List[List[float]]):
-        data: List[Tuple[Tensor, List[dict], float]] = []
+        data: List[Tuple[Tensor, List[dict], float, Tensor]] = []
         for match_data, red_rewards in zip(matches_data, red_matches_rewards):
             state_tensor: Optional[Tensor] = None
             for frame_data, next_frame_data, reward in zip(match_data,

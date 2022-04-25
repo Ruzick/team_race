@@ -97,25 +97,34 @@ def train(args: argparse.Namespace):
                                      RewardCriterion.SCORE)
     match = Match()
 
+    global_step: int = 0
+
     for i_epoch in range(args.epochs):
         print(f'Starting epoch {i_epoch} with dataset size {len(dataset)}')
+
+        generated_dataset = generate_data(
+            match, dqn_player_model, dqn_player_model, 1, reward_criteria,
+            num_frames=args.num_frames,
+            video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
+        mean_generated_reward = torch.tensor([
+            data_entry[2] for data_entry in generated_dataset.data
+        ]).mean()
+        train_logger.add_scalar('mean_generated_reward',
+                                mean_generated_reward,
+                                global_step=global_step)
 
         dataset = merge_datasets(
             dataset,
             # generate_data(match, 'jurgen_agent', dqn_player_model, 1, reward_criteria,
             #               num_frames=args.num_frames, use_red_data=False, use_blue_data=True,
-            #               video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
+            #              video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
             # generate_data(match, dqn_player_model, 'jurgen_agent', 1, reward_criteria,
             #               num_frames=args.num_frames, use_red_data=True, use_blue_data=False,
             #               video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
-            generate_data(match, dqn_player_model, dqn_player_model, 1, reward_criteria,
-                          num_frames=args.num_frames,
-                          video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
+            generated_dataset
         )
         dataset.discard_to_max_size(args.max_dataset_size)
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
-
-        epoch_q_value_loss: Tensor = torch.tensor(0.)
 
         num_epoch_batches: int = 0
         num_epoch_samples: int = 0
@@ -147,16 +156,15 @@ def train(args: argparse.Namespace):
             q_value_loss.backward()
             dqn_optimizer.step()
 
-            epoch_q_value_loss += q_value_loss
-
             num_epoch_batches += 1
             num_epoch_samples += state_batch.size(0)
             if num_epoch_samples >= args.max_epoch_samples:
                 break
 
-        epoch_q_value_loss /= num_epoch_batches
+            mean_pred_q_value = pred_q_value_actual_action_batch.mean()
 
-        log(train_logger, epoch_q_value_loss, i_epoch)
+            log(train_logger, q_value_loss, mean_pred_q_value, global_step)
+            global_step += 1
 
         for param, target_param in zip(dqn_model.parameters(),
                                        target_dqn_model.parameters()):
@@ -165,5 +173,6 @@ def train(args: argparse.Namespace):
     save_dqn_player_model(dqn_player_model)
 
 
-def log(logger: tb.SummaryWriter, value_loss: float, global_step: int):
+def log(logger: tb.SummaryWriter, value_loss: float, mean_q_value: float, global_step: int):
     logger.add_scalar('q_value_loss', value_loss, global_step=global_step)
+    logger.add_scalar('mean_q_value', mean_q_value, global_step=global_step)
