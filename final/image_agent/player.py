@@ -63,7 +63,7 @@ class Team:
         """
         for i in range(2):
 
-          proj = np.array(player_state[i]['camera']['view']).T
+          proj = np.array(player_state[i]['camera']['projection']).T
           view = np.array(player_state[i]['camera']['view']).T
             
           v = view @ np.array(list(ball_location) + [1])
