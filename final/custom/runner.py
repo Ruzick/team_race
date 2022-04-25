@@ -10,6 +10,11 @@ DATASET_PATH = 'image_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 
+GOAL_TEAM1 = [[-10.449999809265137, 0.07000000029802322, -64.5], [10.449999809265137, 0.07000000029802322, -64.5]]
+GOAL_TEAM2 = [[10.460000038146973, 0.07000000029802322, 64.5], [-10.510000228881836, 0.07000000029802322, 64.5]]
+
+#coordinates of the field [[-43.0,-64.5],[43,0,64.5]]
+
 
 def to_native(o):
     # Super obnoxious way to hide pystk
@@ -221,43 +226,26 @@ class Match:
 
 
 
-            #Set up camera 
-
-            aim_point_image=np.zeros((4,2))
-
+            #segmentation labels
             for i in range(len(race.render_data)):
-                proj = np.array(state.players[i].camera.projection).T
-                view = np.array(state.players[i].camera.view).T
-            
-                v = view @ np.array(list(state.soccer.ball.location) + [1])
-                if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) >0:
-                    k = True #kart in view
-                    print('in front')
+                kart_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.kart)
+                puck_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.projectile)
+                b = np.zeros([300,400])
+                mask = np.stack((255*kart_mask,255*puck_mask,b),axis=-1) #segmentation labels 
 
-                    p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
-                    aim_point_image[i,:] = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck for player i 
-                    
-                    kart_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.kart)
-                    puck_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.projectile)
-                    b=np.zeros([300,400])
-                    mask = np.stack((255*kart_mask,255*puck_mask,b),axis=-1) #segmentation labels 
-
-                    if aim_point_image[i,0]<1 and aim_point_image[i,1]<1:
-                        data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8))
-                else:
-                    k = False
-                    print('behind')
+                if np.sum(puck_mask)>0: #if there is puck in the image
+                    data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8))
 
     
-            #if self._use_graphics:
-            #   team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] #odd players in the first team 
-            #   team2_images = [np.array(race.render_data[i].image) for i in range(1, len(race.render_data), 2)] #even players in the second team 
+            if self._use_graphics:
+                team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] 
+                team2_images = [np.array(race.render_data[i].image) for i in range(1, len(race.render_data), 2)]  
 
             # Have each team produce actions (in parallel)
             if t1_can_act:
                 if t1_type == 'image':
-                    #team1_actions_delayed = self._r(team1.act)(team1_state, team1_images)
-                    team1_actions_delayed = self._r(team1.act)(team1_state, team1_images, k, aim_point_image[0,:], state.players[0].kart.velocity)
+                    team1_actions_delayed = self._r(team1.act)(team1_state, team1_images)
+                    #team1_actions_delayed = self._r(team1.act)(team1_state, team1_images, state.soccer.ball.location)
                 else:
                     team1_actions_delayed = self._r(team1.act)(team1_state, team2_state, soccer_state)
 
@@ -370,7 +358,7 @@ if __name__ == '__main__':
 
         '''
         n=1
-        def collect(im1, im2): #can use this as is for data collection 
+        def collect(im1, im2): 
             from PIL import Image
             from os import path
             global n

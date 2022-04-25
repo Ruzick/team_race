@@ -26,8 +26,7 @@ class Team:
         self.team, self.num_players = team, num_players
         return ['tux'] * num_players
 
-    #def act(self, player_state, player_image):
-    def act(self, player_state, player_image, kart, aim, current_vel):
+    def act(self, player_state, player_image):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -62,24 +61,31 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
-        # TODO: Change me. I'm just cruising straight
+        for i in range(2):
+
+          proj = np.array(player_state[i]['camera']['view']).T
+          view = np.array(player_state[i]['camera']['view']).T
+            
+          v = view @ np.array(list(ball_location) + [1])
+          if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) > 0: #if puck in view, follow puck
+
+            p = proj @ view @ np.array(list(ball_location) + [1])
+            aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+
+            steer_angle = 2 * aim[0]
+            self.steer[i] = np.clip(steer_angle, -1, 1)
+          
+          else: #if puck not in view turn around 
+            self.steer[i] = 1
+
+          # Compute accelerate
+          if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
+            self.acceleration[i] = 1.0 
+          else:
+            self.acceleration[i] = 0
         
-        # Compute accelerate
-        if np.linalg.norm(current_vel) < 10:
-          acceleration = 1.0 
-        else:
-          acceleration = 0
 
-        #if kart is not in view lower the speed and look around 
-        if kart == False:
-          steer = 1
+                    
+                   
 
-        #if kart is in view, follow the kart similar to HW5
-
-        else:
-          steer_angle = 2 * aim[0]
-          steer = np.clip(steer_angle, -1, 1)
-        
-
-
-        return [{'acceleration':acceleration, 'steer':steer}] * self.num_players
+        return [{'acceleration':self.acceleration[0], 'steer':self.steer[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1]}]
