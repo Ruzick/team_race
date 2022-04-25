@@ -18,11 +18,13 @@ class DQNModel(nn.Module):
         super().__init__()
         # TODO: Choose a decent network architecture
         self.network = torch.nn.Sequential(
-            torch.nn.Linear(20, 32),
+            torch.nn.Linear(24, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(32, 16),
+            torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(16, 1),
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1),
         )
         self.device = device
         self.flip_for_blue = flip_for_blue
@@ -31,7 +33,7 @@ class DQNModel(nn.Module):
         original_device = input_tensor.device
         input_tensor = torch.atleast_2d(input_tensor.to(self.device))
 
-        if input_tensor.size(-1) == 19:
+        if input_tensor.size(-1) == 23:
             # Input actions have not been made discrete, do this now
             input_tensor = self.make_input_action_discrete(input_tensor)
 
@@ -51,7 +53,7 @@ class DQNModel(nn.Module):
 
     @staticmethod
     def make_input_action_discrete(input_tensor: Tensor) -> Tensor:
-        assert input_tensor.size(-1) == 19, \
+        assert input_tensor.size(-1) == 23, \
             f'Input tensor size {input_tensor.shape} does not match expected size'
 
         action_extraction_info = [
@@ -78,19 +80,23 @@ class DQNModel(nn.Module):
             )
             for input_idx, lower_bound, upper_bound in action_extraction_info
         ], dim=-1)
-        return torch.cat([input_tensor[:, :13], discretized_actions], dim=-1)
+        return torch.cat([input_tensor[:, :17], discretized_actions], dim=-1)
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
-        assert input_tensor.size(-1) == 21, \
+        assert input_tensor.size(-1) == 25, \
             f'Input tensor size {input_tensor.shape} does not match expected size'
         should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
         should_flip_feature[1] = True  # ball to defence goal angle
         should_flip_feature[3] = True  # ball to attack goal angle
-        should_flip_feature[5] = True  # player 1 to ball angle
-        should_flip_feature[7] = True  # player 2 to ball angle
-        should_flip_feature[9] = True  # opponent 1 to ball angle
-        should_flip_feature[11] = True  # opponent 2 to ball angle
+        should_flip_feature[5] = True  # player 1 angle
+        should_flip_feature[6] = True  # player 1 to ball angle
+        should_flip_feature[8] = True  # player 2 angle
+        should_flip_feature[9] = True  # player 2 to ball angle
+        should_flip_feature[11] = True  # opponent 1 angle
+        should_flip_feature[12] = True  # opponent 1 to ball angle
+        should_flip_feature[14] = True  # opponent 2 angle
+        should_flip_feature[15] = True  # opponent 2 to ball angle
 
         flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
         return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)

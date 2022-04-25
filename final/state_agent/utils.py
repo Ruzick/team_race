@@ -1,7 +1,6 @@
 from os import path
 from typing import List
 
-import numpy as np
 import torch
 from torch import Tensor
 from torch.jit import ScriptModule
@@ -30,11 +29,12 @@ def get_kart_to_ball_tensor(kart_state: dict, ball_center: Tensor) -> Tensor:
     kart_to_puck_direction = ball_center - kart_center
     kart_to_puck_angle = torch.atan2(kart_to_puck_direction[1], kart_to_puck_direction[0])
 
-    kart_to_puck_angle_difference = limit_period((kart_angle - kart_to_puck_angle) / np.pi)
+    # kart_to_puck_angle_difference = limit_period((kart_angle - kart_to_puck_angle) / np.pi)
     kart_to_puck_distance = torch.norm(kart_to_puck_direction)
 
-    return torch.tensor([kart_to_puck_angle_difference, kart_to_puck_distance],
-                        dtype=torch.float32)
+    return torch.tensor(
+        [kart_angle, kart_to_puck_angle, kart_to_puck_distance],
+        dtype=torch.float32)
 
 
 def state_to_tensor(team_id: int,
@@ -72,7 +72,7 @@ def state_to_tensor(team_id: int,
         [
             torch.tensor([team_id], dtype=torch.float32),  # 1 dim
             *goal_tensors,  # 2 goals * (angle, dist) -> 4 dim
-            *kart_tensors,  # 4 players * (angle, dist) -> 8 dim
+            *kart_tensors,  # 4 players * (kart angle, kart to ball angle, ball dist) -> 12 dim
         ])
 
     return features_tensor
