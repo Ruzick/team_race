@@ -7,10 +7,11 @@ from torchvision.transforms import functional as F
 
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
+DATA_PATH = 'image_data'
 
 
 class DenseSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path = 'image_data' , transform=dense_transforms.ToTensor()):
+    def __init__(self, dataset_path = DATA_PATH , transform=dense_transforms.ToTensor()):
         from glob import glob
         from os import path
         self.files = []
@@ -30,25 +31,25 @@ class DenseSuperTuxDataset(Dataset):
             im, lbl = self.transform(im, lbl)
         return im, lbl
 
-def load_dense_data(dataset_path='image_data', num_workers=0, batch_size=32, **kwargs):
+def load_dense_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = DenseSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
 
 
 from custom import dense_transforms
-DATASET_PATH = 'ff_data'
+
 class DetectionSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path='ff_data', transform=dense_transforms.ToTensor(), min_size=20):
+    def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor(), min_size=20):
         from glob import glob
         from os import path
-        self.files = []
-        self.label = []
+        self.files = [ ]
+        self.label = [ ]
         self.transform = transform
 
         for f in glob(path.join(dataset_path,'*.csv')):
           self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
 
-        for im_f in glob(path.join(dataset_path,'*.png')):
+        for im_f in glob(path.join(dataset_path,'*_segmentation.png')):
             self.files.append(im_f)
           
 
@@ -66,7 +67,7 @@ class DetectionSuperTuxDataset(Dataset):
         return data
 
 
-def load_detection_data(dataset_path='ff_data', num_workers=0, batch_size=32, **kwargs):
+def load_detection_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = DetectionSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
 
@@ -268,34 +269,34 @@ class ConfusionMatrix(object):
         return self.matrix / (self.matrix.sum(1, keepdims=True) + 1e-5)
 
 
-if __name__ == '__main__':
-    dataset = DenseSuperTuxDataset('dense_data/train', transform=dense_transforms.Compose(
-        [
+# if __name__ == '__main__':
+#     dataset = DenseSuperTuxDataset('dense_data/train', transform=dense_transforms.Compose(
+#         [
         
-        dense_transforms.RandomHorizontalFlip(), 
+#         dense_transforms.RandomHorizontalFlip(), 
 
-        dense_transforms.ToTensor(),
-        dense_transforms.Normalize([0.32352477, 0.3310059 , 0.34449455], [0.25328732, 0.22241966, 0.24833776])
-        ]))
-    from pylab import show, imshow, subplot, axis
+#         dense_transforms.ToTensor(),
+#         dense_transforms.Normalize([0.32352477, 0.3310059 , 0.34449455], [0.25328732, 0.22241966, 0.24833776])
+#         ]))
+#     from pylab import show, imshow, subplot, axis
 
-    for i in range(15):
-        im, lbl = dataset[i]
-        subplot(5, 6, 2 * i + 1)
-        imshow(F.to_pil_image(im))
-        axis('off')
-        subplot(5, 6, 2 * i + 2)
-        imshow(dense_transforms.label_to_pil_image(lbl))
-        axis('off')
-    show()
-    import numpy as np
+#     for i in range(15):
+#         im, lbl = dataset[i]
+#         subplot(5, 6, 2 * i + 1)
+#         imshow(F.to_pil_image(im))
+#         axis('off')
+#         subplot(5, 6, 2 * i + 2)
+#         imshow(dense_transforms.label_to_pil_image(lbl))
+#         axis('off')
+#     show()
+#     import numpy as np
 
-    c = np.zeros(5)
-    for im, lbl in dataset:
-        c += np.bincount(lbl.view(-1), minlength=len(DENSE_LABEL_NAMES))
-    print(100 * c / np.sum(c))
+#     c = np.zeros(5)
+#     for im, lbl in dataset:
+#         c += np.bincount(lbl.view(-1), minlength=len(DENSE_LABEL_NAMES))
+#     print(100 * c / np.sum(c))
 
-    #borrowed from hw2
-def accuracy(outputs, labels):
-    outputs_idx = outputs.max(1)[1].type_as(labels)
-    return outputs_idx.eq(labels).float().mean()
+#     #borrowed from hw2
+# def accuracy(outputs, labels):
+#     outputs_idx = outputs.max(1)[1].type_as(labels)
+#     return outputs_idx.eq(labels).float().mean()

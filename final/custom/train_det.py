@@ -37,7 +37,6 @@ def train(args):#test_logging(train_logger, valid_logger):
     if args.continue_training:
         model.load_state_dict(torch.load(path.join(path.dirname(path.abspath(__file__)), 'planner.th')))
     model.train()
-    # summary(model,(3,128,128))
     
     """
     Your code here.
@@ -55,10 +54,9 @@ def train(args):#test_logging(train_logger, valid_logger):
     sat = args.sat
 
     transform = dense_transforms.Compose([
-        dense_transforms.RandomHorizontalFlip(),
-        # dense_transforms.ColorJitter( 0.9, 0.9, 0.9, hue=hue),#)contrast=0.5, saturation=0.9, hue=0.1), ##low in contrast and brightness for colorjitter #changed from .5 to .2
-        dense_transforms.ToTensor(),
-        dense_transforms.ToHeatmap()
+        # dense_transforms.RandomHorizontalFlip(),
+        dense_transforms.ToTensor()
+        # dense_transforms.ToHeatmap()
         # dense_transforms.Normalize([0.2649056  ,0.26406983 ,0.2644049 ], [0.22418422, 0.22388573 ,0.22410716]) #[0.2649056  0.26406983 0.2644049 ] [0.22418422 0.22388573 0.22410716]
      ] )
     
@@ -73,7 +71,7 @@ def train(args):#test_logging(train_logger, valid_logger):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma2) #every 10k steps
     
 
-    training =load_detection_data('ff_data',batch_size=batch_size,  transform= transform)
+    training =load_detection_data('image_data',batch_size=batch_size,  transform= transform)
     global_step = 0
     torch.manual_seed(33)
     random.seed(33)
@@ -89,33 +87,22 @@ def train(args):#test_logging(train_logger, valid_logger):
 
         loss_= [ ]
         pos = []
-        for image, peak_hm  in load_detection_data('ff_data',batch_size=batch_size,  transform= transform):
-            # print(peak_hm.size())
+        for image, peak_hm  in load_detection_data('image_data',batch_size=batch_size,  transform= transform):
+
             positives = torch.sum(peak_hm.sigmoid())
             elements = torch.numel(peak_hm)
  
-            #pos_weight = torch.full(peak_hm.size(),1)* (torch.sum(peak_hm ==0, (0,2,3))/ torch.sum(peak_hm, (0,2,3))).unsqueeze(dim=-1). unsqueeze(dim=-1)
-            positives_per_channel = torch.sum(peak_hm ==1, (0,2,3))
-            weights =torch.full(peak_hm.size(),1) * (positives_per_channel / torch.max(positives_per_channel)).unsqueeze(dim=-1). unsqueeze(dim=-1)
-            weights = weights.to(device)
-            weight2 = torch.FloatTensor(positives_per_channel / torch.max(positives_per_channel)).view(1,3,1,1).to(device)
-            pos_weight = class_weights# (torch.sum(peak_hm ==0, (0,2,3)) /positives_per_channel).view(1,3,1,1).to(device)
-
             X = image.to(device)
             peak_pred , size_pred = model(X)
 
             peak_pred = peak_pred.to(device)
             peak_hm =( peak_hm).to(device)
-            box_sizes = box_sizes.to(device)
 
-      
-          
             alpha= args.alpha
             gamma= args.gamma
 
-            bce = torch.nn.BCEWithLogitsLoss(reduction = 'none',pos_weight= pos_weight ).to(device)        #pos_weight= pos_weight ,                 
+            bce = torch.nn.BCEWithLogitsLoss(reduction = 'none' ).to(device)                       
             fl_bce = bce(peak_pred,peak_hm).to(device)
-
 
             shifted_inputs = torch.sigmoid(- gamma * (peak_pred * (2 *peak_hm - 1)))
             # # # # # # https://github.com/facebookresearch/fvcore/blob/main/fvcore/nn/focal_loss.py
@@ -168,7 +155,7 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument('log_dir', default = 'temp')
-    parser.add_argument('-b', '--batch_size', type=int, default=128, help = 'batch size')
+    parser.add_argument('-b', '--batch_size', type=int, default=34, help = 'batch size')
     parser.add_argument('-e', '--epochs', type=int , default=10, help = '# of epochs')
     parser.add_argument('-p', '--lr', type=float , default=0.003, help = 'optimization parameter for lr sgd')
     # parser.add_argument('-c', '--continue_training', action='store_true')
@@ -181,17 +168,13 @@ if __name__ == "__main__":
     parser.add_argument('-cont', '--cont',type=float, help='cont', default=0.9)
     parser.add_argument('-sat', '--sat',type=float, help='sat', default=0.9)
     parser.add_argument('-conti', '--continue_training',type=bool, help='sat', default=False)
-    #1/(5*0.52683655), 1/(5*0.02929112), 1/(5*0.4352989), 1/(5*0.0044619), 1/(5*0.00411153)
     # parser.add_argument('-o', '--optimizer', default ='optim.SGD(parameters, lr = args.lr)')
     args = parser.parse_args()
-    #Parse the optmizer
-    # model = CNNClassifier()
     # optimizer = eval(args.optimizer, {'parameters': model.parameters(), 'optim': torch.optim})
     from os import path
     train_logger = tb.SummaryWriter(path.join(args.log_dir, 'train'))
     valid_logger = tb.SummaryWriter(path.join(args.log_dir, 'valid'))
     train(args)
-    #train(model, args.logdir, device= device, n_epochs=argsn_epochs, optimizer= optimizer)
 
 
 

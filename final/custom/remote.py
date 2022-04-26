@@ -1,28 +1,30 @@
+from . import Data
+from tournament.runner import Match, TeamRunner
+from tournament.utils import (BaseRecorder, DataRecorder, MultiRecorder,
+                              VideoRecorder, StateRecorder)
 
-from . import utils
-from . import  runner
 # TODO: Wrap TeamRunner and Team in ray if possible
 try:
     import ray
 
     @ray.remote
-    class RayMatch(runner.Match):
+    class RayMatch(Data.Match):
         pass
 
     @ray.remote
-    class RayTeamRunner(runner.TeamRunner):
+    class RayTeamRunner(Data.TeamRunner):
         pass
 
     @ray.remote
-    class RayStateRecorder(utils.StateRecorder):
+    class RayStateRecorder(StateRecorder):
         pass
 
     @ray.remote
-    class RayDataRecorder(utils.DataRecorder):
+    class RayDataRecorder(DataRecorder):
         pass
 
     @ray.remote
-    class RayVideoRecorder(utils.VideoRecorder):
+    class RayVideoRecorder(VideoRecorder):
         pass
 
     RayMatchException = ray.exceptions.RayTaskError

@@ -46,7 +46,7 @@ class Detector(torch.nn.Module):
         def forward(self, x):
             return F.relu(self.c1(x))
 
-    def __init__(self, layers=[16, 32, 64, 128], n_class=2, kernel_size=3, use_skip=True):
+    def __init__(self, layers=[16, 32, 64, 128], n_class=1, kernel_size=3, use_skip=True):
         """
            Your code here.
            Setup your detection network
@@ -68,7 +68,7 @@ class Detector(torch.nn.Module):
             c = l
             if self.use_skip:
                 c += skip_layer_size[i]
-        self.classifier = torch.nn.Conv2d(c, n_class, 1) #classes are puck and players
+        self.classifier = torch.nn.Conv2d(c, n_class, 1) #changed n_class to puck only
         self.size = torch.nn.Conv2d(c, 2, 1)
 
     def forward(self, x):
@@ -115,7 +115,7 @@ class Detector(torch.nn.Module):
         hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 2 x h x w ) classes are puck and player
         puck_detection = True
         all_lists= []
-        for channel in range (hm.size(dim= 1)):
+        for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
             peaks_per_object = []
             current_list = extract_peak(hm[0][channel], max_det = 30)
             if len(current_list) == 0:
