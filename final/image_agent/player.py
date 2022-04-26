@@ -2,6 +2,10 @@ import numpy as np
 class Team:
     agent_type = 'image'
 
+    acceleration = [0]*2
+    steer = [0]*2
+    brake = [False]*2
+
     def __init__(self):
         """
           TODO: Load your agent here. Load network parameters, and other parts of our model
@@ -61,6 +65,7 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
+
         for i in range(2):
 
           proj = np.array(player_state[i]['camera']['projection']).T
@@ -72,20 +77,33 @@ class Team:
             p = proj @ view @ np.array(list(ball_location) + [1])
             aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
 
-            steer_angle = 2 * aim[0]
-            self.steer[i] = np.clip(steer_angle, -1, 1)
+            #steer_angle = 2 * aim[0]
+            #self.steer[i] = np.clip(steer_angle, -1, 1)
+            x,y = aim
+
+            if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
+              self.acceleration[i] = 1.0 
+            else:
+              self.acceleration[i] = 0
+
+            if x<0:
+              #action.drift=True
+              self.steer[i]=-1
+
+            elif x>0:
+              #action.drift=False
+              self.steer[i]=1
+
+  
+          
           
           else: #if puck not in view turn around 
             self.steer[i] = 1
+            self.brake[i] = True
 
-          # Compute accelerate
-          if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
-            self.acceleration[i] = 1.0 
-          else:
-            self.acceleration[i] = 0
         
 
                     
                    
 
-        return [{'acceleration':self.acceleration[0], 'steer':self.steer[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1]}]
+        return [{'acceleration':self.acceleration[0], 'steer':self.steer[0], 'brake':self.brake[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1], 'brake':self.brake[1]}]
