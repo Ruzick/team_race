@@ -112,36 +112,36 @@ class Detector(torch.nn.Module):
                  in order to improve this. The input data only contains information of when the puck is in front of the kart.
 
         """
-        hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 2 x h x w ) classes are puck and player
-        puck_detection = True
-        all_lists= []
-        for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
-            peaks_per_object = []
-            current_list = extract_peak(hm[0][channel], max_det = 30)
-            if len(current_list) == 0:
-                if channel ==0:
-                    print("no object detected", current_list,channel)
-                    puck_detection = False
-                    c_x = 0
-                    c_y = 0
-                    current_list =[0,0,0]
-                #puck is somewhere in the front but not caught by segmentation
-            else: 
-            #get the max peak value, so it doenst think something else is a puck
-                print("puck detected", channel)
-                # puck = max(current_list, key=lambda x: x[0])
-                # # c_x = puck[1]
-                # c_y = puck[2]
-                # current_list =[0,c_x,c_y]
-            for each_object in current_list:
-
-                peaks_per_object.append( puck_detection,int(each_object[1]),int(each_object[2])) 
+        # hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 2 x h x w ) classes are puck and player
+        # all_lists= []
+        # for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
+        #     peaks_per_object = []
+        #     current_list = extract_peak(hm[0][channel], max_det = 30)
+        #     if len(current_list) == 0:
+        #         if channel ==0:
+        #             print("no object detected", current_list,channel)
+        #             current_list =[0,0,0]
+        #         #puck is somewhere in the front but not caught by segmentation
+        #     else: 
+        #     #get the max peak value, so it doenst think something else is a puck
+        #         print("puck detected", channel)
+        #         # puck = max(current_list, key=lambda x: x[0])
+        #         # # c_x = puck[1]
+        #         # c_y = puck[2]
+        #         # current_list =[0,c_x,c_y]
+        #     for each_object in current_list:
+        #         print(each_object[0])
+        #         peaks_per_object.append(float(each_object[0]) ,int(each_object[1]),int(each_object[2])) 
 
 
-            all_lists.append(peaks_per_object) #contains both 
-        print(puck)
+        #     all_lists.append(peaks_per_object) #contains both 
+        # print(puck)
+        # return  all_lists
 
-        return  all_lists
+        cls, size = self.forward(image[None])
+        size = size.cpu()
+        return [[(s, x, y, float(size[0, 0, y, x]), float(size[0, 1, y, x]))
+                 for s, x, y in extract_peak(c, max_det=30, **kwargs)] for c in cls[0]]
 
 
 def save_model(model):

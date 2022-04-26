@@ -7,7 +7,7 @@ import tournament.grader
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
-DATASET_PATH = 'image_data'
+DATASET_PATH = 'image_data_seg_loc'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 

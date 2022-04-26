@@ -37,35 +37,32 @@ class ToTensor(object):
         return (F.to_tensor(image),) + args
 
 
-def get_detections(det, output_heat, radius=2):
-    for d in det:
-        # Compute the region to crop from the image
-        x, y = d[0], d[1]
-        R0, Rx, Ry = 2 * radius, 2 * radius + (int(x) != x), 2 * radius + (int(y) != y)
-        # Crop
-        heat_crop = output_heat[max(int(y) - R0, 0):int(y) + Ry + 1, max(int(x) - R0, 0):int(x) + Rx + 1]
-
-        # Compute the Gaussian at the right position
-        g_x = (-((torch.arange(heat_crop.size(1), device=heat_crop.device).float() - min(R0, int(x)) - x + int(
-            x)) / radius) ** 2).exp()
-        g_y = (-((torch.arange(heat_crop.size(0), device=heat_crop.device).float() - min(R0, int(y)) - y + int(
-            y)) / radius) ** 2).exp()
-        gaussian = g_x[None, :] * g_y[:, None]
-
-        # Update the heatmaps
-        heat_crop[...] = torch.max(heat_crop, gaussian)
-
-
-def to_heatmap(im, *dets, device=None, **kwargs):
-    det_map = torch.zeros((len(dets),) + im.shape[1:], device=device)
-    for i, det in enumerate(dets):
-        get_detections(det, det_map[i], **kwargs)
-    return im, det_map
-
 
 class ToHeatmap(object):
     def __init__(self, radius=2):
         self.radius = radius
 
-    def __call__(self, image, *args):
-        return to_heatmap(image, *args, radius=self.radius)
+    def __call__(self, image, *dets):
+        peak, size = detections_to_heatmap(dets, image.shape[1:], radius=self.radius)
+        return image, peak, size
+
+
+def detections_to_heatmap(dets, shape, radius=2, device=None):
+    with torch.no_grad():
+        size = torch.zeros((2, shape[0], shape[1]), device=device)
+        peak = torch.zeros((len(dets), shape[0], shape[1]), device=device)
+        for i, det in enumerate(dets):
+            if len(det):
+                det = torch.tensor(det.astype(float), dtype=torch.float32, device=device)
+                cx, cy = (det[:, 0] + det[:, 2] - 1) / 2, (det[:, 1] + det[:, 3] - 1) / 2
+                x = torch.arange(shape[1], dtype=cx.dtype, device=cx.device)
+                y = torch.arange(shape[0], dtype=cy.dtype, device=cy.device)
+                gx = (-((x[:, None] - cx[None, :]) / radius)**2).exp()
+                gy = (-((y[:, None] - cy[None, :]) / radius)**2).exp()
+                gaussian, id = (gx[None] * gy[:, None]).max(dim=-1)
+                mask = gaussian > peak.max(dim=0)[0]
+                det_size = (det[:, 2:] - det[:, :2]).T / 2
+                size[:, mask] = det_size[:, id[mask]]
+                peak[i] = gaussian
+        return peak, size
+

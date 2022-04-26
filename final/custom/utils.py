@@ -60,9 +60,9 @@ class DetectionSuperTuxDataset(Dataset):
         label = self.label[idx]
         b = self.files[idx]
         im = Image.open(b +".png")
-        lbl = Image.open(b + '_segmentation.png')
-        lbl = self.transform(lbl) #everything has to be a tensor
-        data = im, lbl, label
+        # lbl = Image.open(b + '_segmentation.png')
+        # lbl = self.transform(lbl) #everything has to be a tensor
+        data = im, label #lbl
         if self.transform is not None:
             data = self.transform(*data)
         return data
