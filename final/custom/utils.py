@@ -49,22 +49,24 @@ class DetectionSuperTuxDataset(Dataset):
         for f in glob(path.join(dataset_path,'*.csv')):
           self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
 
-        for im_f in glob(path.join(dataset_path,'*_segmentation.png')):
-            self.files.append(im_f)
-          
+        for seg_im_f in glob(path.join(dataset_path,'*_segmentation.png')):
+            self.files.append(seg_im_f.replace('_segmentation.png', ''))
+
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
-        import numpy as np
         label = self.label[idx]
         b = self.files[idx]
-        im = Image.open(b)
-        data = im, label
+        im = Image.open(b +".png")
+        lbl = Image.open(b + '_segmentation.png')
+        lbl = self.transform(lbl) #everything has to be a tensor
+        data = im, lbl, label
         if self.transform is not None:
             data = self.transform(*data)
         return data
+
 
 
 def load_detection_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
