@@ -245,7 +245,6 @@ class Match:
                     for j in range(len(race.render_data)):
                         V = view @ np.array(list(state.players[j].kart.location) + [1])
                         if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0: #if kart in the same halfspace 
-                            print(j)
                             p = proj @ view @ np.array(list(state.players[j].kart.location) + [1])
                             aim = np.array([p[0] / p[-1], -p[1] / p[-1]]) #image coordinates 
                             if np.abs(aim[0]) <= 1 and np.abs(aim[1]) <= 1: #if kart in view 
