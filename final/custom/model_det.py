@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-
+import pystk
 
 def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
     """
@@ -69,7 +69,7 @@ class Detector(torch.nn.Module):
             if self.use_skip:
                 c += skip_layer_size[i]
         self.classifier = torch.nn.Conv2d(c, n_class, 1) #changed n_class to puck only
-        self.size = torch.nn.Conv2d(c, 2, 1)
+        # self.size = torch.nn.Conv2d(c, 2, 1)
 
     def forward(self, x):
         """
@@ -91,14 +91,14 @@ class Detector(torch.nn.Module):
             # Add the skip connection
             if self.use_skip:
                 z = torch.cat([z, up_activation[i]], dim=1)
-        return self.classifier(z), self.size(z)
+        return self.classifier(z)#, self.size(z)
 
-    def detect(self, image, **kwargs):
+    def detect(self, image, player, **kwargs):
         import numpy as np
         """
            Your code here.
            Implement object detection here.
-           @image: 3 x H x W image
+           @image: 3 x H x W image    ....3x300x400
            @return: Three list of detections [(score, cx, cy, w/2, h/2), ...], one per class,
                     return no more than 30 detections per image per class. You only need to predict width and height
                     for extra credit. If you do not predict an object size, return w=0, h=0.
@@ -112,36 +112,44 @@ class Detector(torch.nn.Module):
                  in order to improve this. The input data only contains information of when the puck is in front of the kart.
 
         """
-        # hm, size_h_w = self.forward(image.unsqueeze(0)) #image[None] shape is then (1 x 2 x h x w ) classes are puck and player
-        # all_lists= []
-        # for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
-        #     peaks_per_object = []
-        #     current_list = extract_peak(hm[0][channel], max_det = 30)
-        #     if len(current_list) == 0:
-        #         if channel ==0:
-        #             print("no object detected", current_list,channel)
-        #             current_list =[0,0,0]
-        #         #puck is somewhere in the front but not caught by segmentation
-        #     else: 
-        #     #get the max peak value, so it doenst think something else is a puck
-        #         print("puck detected", channel)
-        #         # puck = max(current_list, key=lambda x: x[0])
-        #         # # c_x = puck[1]
-        #         # c_y = puck[2]
-        #         # current_list =[0,c_x,c_y]
-        #     for each_object in current_list:
-        #         print(each_object[0])
-        #         peaks_per_object.append(float(each_object[0]) ,int(each_object[1]),int(each_object[2])) 
-
+        hm = self.forward(image)#.unsqueeze(0)) #image[None] shape is then (1 x 1 x h x w ) classes are puck and player
+        all_lists= []
+        for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
+            peaks_per_object = []
+            current_list = extract_peak(hm[0][channel], max_det = 30)
+            if len(current_list) == 0:
+                if channel ==0:
+                    print("no object detected", current_list,channel)
+                    current_list =[0,0]
+                #puck is somewhere in the front but not caught by segmentation
+            else: 
+            #get the max peak value, so it doenst think something else is a puck
+                print("puck detected", channel)
+                puck = max(current_list, key=lambda x: x[0])
+                cx = puck[1]
+                cy = puck[2]
+            #     current_list =[cx,cy]
+            # for each_object in current_list:
+            #     print(each_object, 'each object')
+            #     peaks_per_object.append(int(each_object[0]),int(each_object[1])) 
+            
 
         #     all_lists.append(peaks_per_object) #contains both 
         # print(puck)
-        # return  all_lists
 
-        cls, size = self.forward(image[None])
-        size = size.cpu()
-        return [[(s, x, y, float(size[0, 0, y, x]), float(size[0, 1, y, x]))
-                 for s, x, y in extract_peak(c, max_det=30, **kwargs)] for c in cls[0]]
+        #convert to normalize image
+
+            proj = np.array(state.players[i].camera.projection).T
+            view = np.array(state.players[i].camera.view).T
+            p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
+            aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+
+        return  [cx,cy]#all_lists
+
+        # cls, size = self.forward(image[None])
+        # size = size.cpu()
+        # return [[(s, x, y, float(size[0, 0, y, x]), float(size[0, 1, y, x]))
+        #          for s, x, y in extract_peak(c, max_det=30, **kwargs)] for c in cls[0]]
 
 
 def save_model(model):

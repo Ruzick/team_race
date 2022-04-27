@@ -40,20 +40,23 @@ def train(args):
     for epoch in range(args.num_epoch):
         model.train()
 
-        for img, gt_det  in train_data:
-            img, gt_det = img.to(device), gt_det.to(device)
+        for img, loc in train_data:
+            img = img.to(device)
 
-            size_w, _ = gt_det.max(dim=1, keepdim=True)
+            print(img.size())
+            print('loc', loc.size()) #32x2  [-1,2]
+            # size_w, _ = gt_det.max(dim=1, keepdim=True)
 
-            det, size = model(img)
+            det = model.detect(img)
+            print('det', det) #32x1x200x300  32xclassxheightxwidth
             # Continuous version of focal loss
-            p_det = torch.sigmoid(det * (1-2*gt_det))
-            det_loss_val = (det_loss(det, gt_det)*p_det).mean() / p_det.mean()
+            p_det = torch.sigmoid(det * (1-2*loc))
+            det_loss_val = (det_loss(det, loc)*p_det).mean() / p_det.mean()
             # size_loss_val = (size_w * size_loss(size, gt_size)).mean() / size_w.mean()
             loss_val = det_loss_val  * args.size_weight
 
             if train_logger is not None and global_step % 100 == 0:
-                log(train_logger, img, gt_det, det, global_step)
+                log(train_logger, img, loc, det, global_step)
 
             if train_logger is not None:
                 train_logger.add_scalar('det_loss', det_loss_val, global_step)
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num_epoch', type=int, default=120)
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3)
     parser.add_argument('-c', '--continue_training', action='store_true')
-    parser.add_argument('-t', '--transform',default='Compose([ RandomHorizontalFlip(), ToTensor(),ToHeatmap()])')
+    parser.add_argument('-t', '--transform',default='Compose([ RandomHorizontalFlip(), ToTensor()])')
     parser.add_argument('-w', '--size-weight', type=float, default=0.01)
 
     args = parser.parse_args()
