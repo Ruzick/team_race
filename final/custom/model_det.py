@@ -139,7 +139,7 @@ class Detector(torch.nn.Module):
         # print(puck)
 
 
-        return  [cx,cy]#all_lists  change this so that it returns batch size
+        return  [cx,cy]   #all_lists  change this so that it returns batch size
 
         # cls, size = self.forward(image[None])
         # size = size.cpu()
