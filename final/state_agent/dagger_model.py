@@ -56,11 +56,11 @@ class DaggerModel(nn.Module):
         assert action_fragment.size(0) == 1, 'batching is only supported in training'
         action_fragment = action_fragment.squeeze()
 
-        brake = torch.round(action_fragment[2])
+        brake = torch.round(torch.sigmoid(action_fragment[2]))
 
         return torch.stack([
             torch.sigmoid(action_fragment[0])
             if brake == 0 else torch.tensor(0., dtype=torch.float32).to(action_fragment.device),
             2 * torch.sigmoid(action_fragment[1]) - 1,
-            torch.round(action_fragment[2])
+            brake
         ])
