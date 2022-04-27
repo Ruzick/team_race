@@ -8,6 +8,7 @@ class Algorithm(Enum):
     DDPG = 'DDPG'
     DDQN = 'DDQN'
     HUMAN = 'HUMAN'
+    Dagger = 'Dagger'
 
 
 def all_algorithms() -> List[Algorithm]:
@@ -15,6 +16,7 @@ def all_algorithms() -> List[Algorithm]:
         Algorithm.DDPG,
         Algorithm.DDQN,
         Algorithm.HUMAN,
+        Algorithm.Dagger,
     ]
 
 

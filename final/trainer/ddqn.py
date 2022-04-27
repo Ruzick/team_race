@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import torch.utils.tensorboard as tb
 from state_agent.ddqn_model import DQNModel, DQNPlayerModel
-from state_agent.utils import copy_parameters, load_model, save_model
+from state_agent.utils import copy_parameters, load_model, save_model, state_to_tensor
 from torch import Tensor
 from torch.jit import ScriptModule
 from torch.utils.data import DataLoader
@@ -95,7 +95,7 @@ def train(args: argparse.Namespace):
 
     dqn_optimizer = torch.optim.Adam(dqn_model.parameters())
 
-    dataset = FramesDataset()
+    dataset = FramesDataset(state_to_tensor)
 
     reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST,
                                      RewardCriterion.SCORE)

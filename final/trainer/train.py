@@ -1,6 +1,7 @@
 import argparse
 
-from trainer.algorithm import (Algorithm, AlgorithmImpl, all_algorithms)
+from trainer.algorithm import Algorithm, AlgorithmImpl, all_algorithms
+from trainer.dagger import Dagger
 from trainer.ddpg import DDPG
 from trainer.ddqn import DDQN
 from trainer.human import HUMAN
@@ -20,6 +21,8 @@ def get_impl(algorithm: Algorithm) -> AlgorithmImpl:
         return DDQN()
     if algorithm is Algorithm.HUMAN:
         return HUMAN()
+    if algorithm is Algorithm.Dagger:
+        return Dagger()
 
     raise NotImplementedError(f'Algorithm {algorithm} is not yet implemented')
 

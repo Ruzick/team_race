@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from state_agent.player import Team
@@ -14,29 +14,32 @@ from trainer.reward import RewardCriteria, get_match_rewards
 
 
 class FramesDataset(Dataset):
-    def __init__(self, transform=None):
+    def __init__(self,
+                 state_to_tensor_fn: Callable[[int, List[dict], List[dict], dict], Tensor],
+                 transform=None):
         self.transform = transform
-        self.data: List[Tuple[Tensor, List[dict], float, Tensor]] = []
+        self.data: List[Tuple[Tensor, Tensor, float, Tensor]] = []
+        self.state_to_tensor_fn = state_to_tensor_fn or state_to_tensor
 
     def add_data(self,
                  matches_data: List[List[dict]],
                  red_matches_rewards: List[List[float]],
                  blue_matches_rewards: List[List[float]]):
-        data: List[Tuple[Tensor, List[dict], float, Tensor]] = []
+        data: List[Tuple[Tensor, Tensor, float, Tensor]] = []
         for match_data, red_rewards in zip(matches_data, red_matches_rewards):
             state_tensor: Optional[Tensor] = None
             for frame_data, next_frame_data, reward in zip(match_data,
                                                            match_data[1:],
                                                            red_rewards):
                 if state_tensor is None:
-                    state_tensor = state_to_tensor(0,
-                                                   frame_data['team1_state'],
-                                                   frame_data['team2_state'],
-                                                   frame_data['soccer_state'])
-                next_state_tensor = state_to_tensor(0,
-                                                    next_frame_data['team1_state'],
-                                                    next_frame_data['team2_state'],
-                                                    next_frame_data['soccer_state'])
+                    state_tensor = self.state_to_tensor_fn(0,
+                                                           frame_data['team1_state'],
+                                                           frame_data['team2_state'],
+                                                           frame_data['soccer_state'])
+                next_state_tensor = self.state_to_tensor_fn(0,
+                                                            next_frame_data['team1_state'],
+                                                            next_frame_data['team2_state'],
+                                                            next_frame_data['soccer_state'])
                 actions = self.action_dicts_to_tensor(frame_data['actions'][0::2])
                 data.append((state_tensor, actions, reward, next_state_tensor))
 
@@ -48,14 +51,14 @@ class FramesDataset(Dataset):
                                                            match_data[1:],
                                                            blue_rewards):
                 if state_tensor is None:
-                    state_tensor = state_to_tensor(1,
-                                                   frame_data['team2_state'],
-                                                   frame_data['team1_state'],
-                                                   frame_data['soccer_state'])
-                next_state_tensor = state_to_tensor(1,
-                                                    next_frame_data['team2_state'],
-                                                    next_frame_data['team1_state'],
-                                                    next_frame_data['soccer_state'])
+                    state_tensor = self.state_to_tensor_fn(1,
+                                                           frame_data['team2_state'],
+                                                           frame_data['team1_state'],
+                                                           frame_data['soccer_state'])
+                next_state_tensor = self.state_to_tensor_fn(1,
+                                                            next_frame_data['team2_state'],
+                                                            next_frame_data['team1_state'],
+                                                            next_frame_data['soccer_state'])
                 actions = self.action_dicts_to_tensor(frame_data['actions'][1::2])
                 data.append((state_tensor, actions, reward, next_state_tensor))
 
@@ -91,7 +94,8 @@ class FramesDataset(Dataset):
 
 
 def merge_datasets(*frame_datasets: FramesDataset) -> FramesDataset:
-    merged_dataset = FramesDataset(frame_datasets[0].transform)
+    merged_dataset = FramesDataset(frame_datasets[0].state_to_tensor_fn,
+                                   transform=frame_datasets[0].transform)
     for frame_dataset in frame_datasets:
         merged_dataset.data += frame_dataset.data
 
@@ -108,21 +112,25 @@ def generate_data(match: Match,
                   video_path: Optional[str] = None,
                   num_frames: Optional[int] = None,
                   initial_ball_location: Optional[Tuple[float, float]] = None,
-                  initial_ball_velocity: Optional[Tuple[float, float]] = None
+                  initial_ball_velocity: Optional[Tuple[float, float]] = None,
+                  state_to_tensor_fn: Optional[Callable[[int, List[dict], List[dict], dict],
+                                                        Tensor]] = None
                   ) -> FramesDataset:
 
     if not use_red_data and not use_blue_data:
         raise RuntimeError("At least one team's data must be used")
 
+    state_to_tensor_fn = state_to_tensor_fn or state_to_tensor
+
     if isinstance(team_or_dir1, str):
         team1_runner = TeamRunner(team_or_dir1)
     else:
-        team1_runner = TeamRunner(Team(team_or_dir1))
+        team1_runner = TeamRunner(Team(team_or_dir1, state_to_tensor_fn))
 
     if isinstance(team_or_dir2, str):
         team2_runner = TeamRunner(team_or_dir2)
     else:
-        team2_runner = TeamRunner(Team(team_or_dir2))
+        team2_runner = TeamRunner(Team(team_or_dir2, state_to_tensor_fn))
 
     if video_path is not None:
         print(f'Starting video recording to {video_path}')
@@ -146,7 +154,7 @@ def generate_data(match: Match,
             for match_data in matches_data
         ]
 
-    dataset = FramesDataset()
+    dataset = FramesDataset(state_to_tensor_fn)
     dataset.add_data(matches_data, red_matches_rewards, blue_matches_rewards)
     return dataset
 

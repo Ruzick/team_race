@@ -1,7 +1,8 @@
 
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import torch
+from torch import Tensor
 from torch.jit import ScriptModule
 
 from .utils import load_model, state_to_tensor
@@ -11,7 +12,9 @@ class Team:
     agent_type = 'state'
 
     def __init__(self,
-                 model: Optional[ScriptModule] = None):
+                 model: Optional[ScriptModule] = None,
+                 state_to_tensor_fn: Optional[Callable[[int, List[dict], List[dict], dict],
+                                                       Tensor]] = None):
         """
         TODO: Load your agent here. Load network parameters, and other parts
         of our model. We will call this function with default arguments only.
@@ -24,6 +27,8 @@ class Team:
         else:
             device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
             self.model: ScriptModule = load_model().to(device)
+
+        self.state_to_tensor_fn = state_to_tensor_fn or state_to_tensor
 
     def new_match(self, team: int, num_players: int) -> List[str]:
         """
@@ -75,8 +80,7 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
-        features = state_to_tensor(self.team, player_state, opponent_state,
-                                   soccer_state)
+        features = self.state_to_tensor_fn(self.team, player_state, opponent_state, soccer_state)
         p1_accel, p1_steer, p1_brake, p2_accel, p2_steer, p2_brake = self.model(features)
         actions = [
             {
