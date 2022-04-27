@@ -97,7 +97,7 @@ def generate_dagger_data(match: Match,
         action: Tensor = torch.cat([
             *target_model(state[:half_last_dim]),
             *target_model(state[half_last_dim:])
-        ]).squeeze()
+        ]).squeeze().detach().clone()
         dataset.data[i_entry] = (entry[0], action, entry[1], entry[2])
 
     return dataset
