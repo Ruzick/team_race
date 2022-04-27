@@ -72,7 +72,7 @@ class Team:
           view = np.array(player_state[i]['camera']['view']).T
             
           v = view @ np.array(list(ball_location) + [1])
-          if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) > 0: #if puck in view, follow puck
+          if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #if puck in view, follow puck
 
             p = proj @ view @ np.array(list(ball_location) + [1])
             aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
