@@ -76,7 +76,7 @@ def generate_dagger_data(match: Match,
     datasets = [
         generate_data(
             match, dagger_model, opponent, num_matches, reward_criteria,
-            use_red_data=False, num_frames=num_frames,
+            use_blue_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
                 i_epoch, video_epochs_interval, f'{opponent}-blue'),
@@ -85,7 +85,7 @@ def generate_dagger_data(match: Match,
     ] + [
         generate_data(
             match, opponent, dagger_model, num_matches, reward_criteria,
-            use_blue_data=False, num_frames=num_frames,
+            use_red_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
                 i_epoch, video_epochs_interval, f'{opponent}-red'),
