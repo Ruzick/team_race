@@ -43,9 +43,10 @@ def train(args):
             img = img.to(device)
             loc = (loc).to(device)
             det = model.detect(img)
-            print(img.size())
+            print(img.size())  #torch.Size([32, 3, 300, 400])
             print('det', det) #32x1x200x300  32xclassxheightxwidth but i get a [123, 232]
             print('loc', loc) #32x ]123,233]
+            print(len(det))
             # Continuous version of focal loss
             p_det = torch.sigmoid(det * (1-2*loc))
             det_loss_val = (det_loss(det, loc)*p_det).mean() / p_det.mean()

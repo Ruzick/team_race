@@ -117,29 +117,41 @@ class Detector(torch.nn.Module):
         for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
             peaks_per_object = []
             current_list = extract_peak(hm[0][channel], max_det = 30)
-            if len(current_list) == 0:
-                if channel ==0:
-                    print("no object detected", current_list,channel)
-                    current_list =[0,0]
-                #puck is somewhere in the front but not caught by segmentation
-            else: 
-            #get the max peak value, so it doenst think something else is a puck
-                print("puck detected", channel)
-                puck = max(current_list, key=lambda x: x[0])
-                cx = puck[1]
-                cy = puck[2]
-            #     current_list =[cx,cy]
-            # for each_object in current_list: 
-            #     print(each_object, 'each object')
-            #     peaks_per_object.append(int(each_object[0]),int(each_object[1])) 
-            #1) convert to 3d coordinates?
-            # 
+            # if len(current_list) == 0:
+            #     if channel ==0:
+            #         print("no object detected", current_list,channel)
+            #         current_list =[0,0]
+            #     #puck is somewhere in the front but not caught by segmentation
+            # else: 
+        #     #get the max peak value, so it doenst think something else is a puck
+        #         print("puck detected", channel)
+        #         puck = max(current_list, key=lambda x: x[0])
+        #         cx = puck[1]
+        #         cy = puck[2]
+        #     #     current_list =[cx,cy]
+        #     # for each_object in current_list: 
+        #     #     print(each_object, 'each object')
+        #     #     peaks_per_object.append(int(each_object[0]),int(each_object[1])) 
+        #     #1) convert to 3d coordinates?
+        #     # 
 
-        #     all_lists.append(peaks_per_object) #contains both 
-        # print(puck)
+        # #     all_lists.append(peaks_per_object) #contains both 
+        # # print(puck)
+            peaks_per_object=[]
+
+            for each_object in current_list:
+
+                # peaks_per_object.append(    ( float(each_object[0]),int(each_object[1]),int(each_object[2]),\
+                #      float(size_h_w[0,1,int(each_object[2]),int(each_object[1])] ) ,\
+                #           float(size_h_w[0,0,each_object[2],each_object[1]])  ) ) 
+                
+                peaks_per_object.append(    ( int(each_object[1]),int(each_object[2])))
 
 
-        return  [cx,cy]   #all_lists  change this so that it returns batch size
+            all_lists.append(peaks_per_object)
+
+
+        return  all_lists#[cx,cy]   #all_lists  change this so that it returns batch size
 
         # cls, size = self.forward(image[None])
         # size = size.cpu()
