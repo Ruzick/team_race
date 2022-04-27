@@ -114,15 +114,16 @@ def adjust_target_output(target_output: Tensor) -> Tensor:
             + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device)[None, :])
 
 
-def adjust_model_output(model_output: Tensor, adjusted_target_output: Tensor) -> Tensor:
-    # Set acceleration to 0 if target asks for braking, so that acceleration is not punished.
-    modifier = (adjusted_target_output[:, -1] != 0).detach().clone().type(torch.float32)
-    model_accel = modifier * model_output[:, 0]
-    return torch.cat([model_accel[:, None], model_output[:, 1:]], dim=-1)
+def adjust_model_output(model_output: Tensor, _: Tensor) -> Tensor:
+    return model_output
+    # # Set acceleration to 0 if target asks for braking, so that acceleration is not punished.
+    # modifier = (adjusted_target_output[:, -1] != 0).detach().clone().type(torch.float32)
+    # model_accel = modifier * model_output[:, 0]
+    # return torch.cat([model_accel[:, None], model_output[:, 1:]], dim=-1)
 
 
 def get_loss_fn() -> Callable[[Tensor, Tensor], Tensor]:
-    accel_loss_fn = torch.nn.BCEWithLogitsLoss()
+    # accel_loss_fn = torch.nn.BCEWithLogitsLoss()
     steer_loss_fn = torch.nn.CrossEntropyLoss()
     brake_loss_fn = torch.nn.BCEWithLogitsLoss()
 
@@ -130,11 +131,12 @@ def get_loss_fn() -> Callable[[Tensor, Tensor], Tensor]:
         adjusted_target = adjust_target_output(target)
         model_output = adjust_model_output(model_output, adjusted_target)
 
-        accel_loss: Tensor = accel_loss_fn(model_output[:, 0], adjusted_target[:, 0])
-        steer_loss: Tensor = steer_loss_fn(model_output[:, 1:4],
+        # accel_loss: Tensor = accel_loss_fn(model_output[:, 0], adjusted_target[:, 0])
+        steer_loss: Tensor = steer_loss_fn(model_output[:, 0:3],
                                            adjusted_target[:, 1].type(torch.long))
-        brake_loss: Tensor = brake_loss_fn(model_output[:, 4], adjusted_target[:, 2])
-        return accel_loss + steer_loss + brake_loss
+        brake_loss: Tensor = brake_loss_fn(model_output[:, 3], adjusted_target[:, 2])
+        # return accel_loss + steer_loss + brake_loss
+        return steer_loss + brake_loss
 
     return loss_fn
 

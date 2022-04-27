@@ -29,7 +29,7 @@ class DaggerModel(nn.Module):
             torch.nn.Linear(64, 32),
             torch.nn.ReLU(),
             torch.nn.BatchNorm1d(32),
-            torch.nn.Linear(32, 5),
+            torch.nn.Linear(32, 4),
         )
         self.device = device
         self.eval()
@@ -47,7 +47,7 @@ class DaggerModel(nn.Module):
         return torch.cat([p1_output, p2_output], dim=-1).to(original_device)
 
     def to_output_tensor(self, action_fragment: Tensor) -> Tensor:
-        assert action_fragment.size(-1) == 5, \
+        assert action_fragment.size(-1) == 4, \
             'Unexpected number of elements in action fragment'
 
         if self.training:
@@ -56,11 +56,10 @@ class DaggerModel(nn.Module):
         assert action_fragment.size(0) == 1, 'batching is only supported in training'
         action_fragment = action_fragment.squeeze()
 
-        brake = torch.round(torch.sigmoid(action_fragment[4]))
+        brake = torch.round(torch.sigmoid(action_fragment[3]))
 
         return torch.stack([
-            torch.sigmoid(action_fragment[0])
-            if brake == 0 else torch.tensor(0., dtype=torch.float32).to(action_fragment.device),
-            torch.argmax(action_fragment[1:4]) - 1,
+            1 - brake,
+            torch.argmax(action_fragment[0:3]) - 1,
             brake
         ])
