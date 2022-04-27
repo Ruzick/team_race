@@ -6,7 +6,7 @@ from os import makedirs
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
-DATASET_PATH = 'image_data'
+DATASET_PATH = 'img_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 
@@ -238,8 +238,26 @@ class Match:
                     view = np.array(state.players[i].camera.view).T
                     p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
                     aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+                    x_puck = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                    y_puck = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
 
-                    data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), aim)
+                    k = []
+                    for j in range(len(race.render_data)):
+                        V = view @ np.array(list(state.players[j].kart.location) + [1])
+                        if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0: #if kart in the same halfspace 
+                            print(j)
+                            p = proj @ view @ np.array(list(state.players[j].kart.location) + [1])
+                            aim = np.array([p[0] / p[-1], -p[1] / p[-1]]) #image coordinates 
+                            if np.abs(aim[0]) <= 1 and np.abs(aim[1]) <= 1: #if kart in view 
+                                x_kart = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                                y_kart = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
+                                k.append([x_kart, y_kart])
+
+
+
+
+
+                    data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), np.array([x_puck, y_puck], dtype = np.uint16), np.array(k, dtype = np.uint16))
 
     
             if self._use_graphics:
@@ -363,7 +381,7 @@ if __name__ == '__main__':
 
         '''
         n=1
-        def collect(im1, im2,pt): 
+        def collect(im1, im2, puck, kart): 
             from PIL import Image
             from os import path
             global n
@@ -371,8 +389,9 @@ if __name__ == '__main__':
             Image.fromarray(im1).save(fn + '.png')
 
             Image.fromarray(im2).save(fn + '_segmentation'+'.png')
-            with open(fn + '.csv', 'w') as f:
-                f.write('%0.1f,%0.1f' % tuple(pt))
+            #with open(fn + '.csv', 'w') as f:
+            #    f.write('%0.1f,%0.1f' % tuple(pt))
+            np.savez(fn, puck= puck, kart= kart)
             n += 1
 
 
