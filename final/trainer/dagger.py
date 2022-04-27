@@ -172,7 +172,7 @@ def train(args: argparse.Namespace):
 
         dagger_model.eval()
         generated_dataset = generate_dagger_data(
-            match, dagger_model, target_model, opponents, 5, i_epoch,
+            match, dagger_model, target_model, opponents, 1, i_epoch,
             args.video_epochs_interval, args.num_frames)
         dagger_model.train()
 
