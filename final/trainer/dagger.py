@@ -67,6 +67,7 @@ def generate_dagger_data(match: Match,
                          dagger_model: ScriptModule,
                          target_model: ScriptModule,
                          opponents: List[str],
+                         num_matches: int,
                          i_epoch: int,
                          video_epochs_interval: int = -1,
                          num_frames: Optional[int] = None) -> FramesDataset:
@@ -74,7 +75,7 @@ def generate_dagger_data(match: Match,
 
     datasets = [
         generate_data(
-            match, dagger_model, opponent, 1, reward_criteria,
+            match, dagger_model, opponent, num_matches, reward_criteria,
             use_red_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
@@ -83,7 +84,7 @@ def generate_dagger_data(match: Match,
         for opponent in opponents
     ] + [
         generate_data(
-            match, opponent, dagger_model, 1, reward_criteria,
+            match, opponent, dagger_model, num_matches, reward_criteria,
             use_blue_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
@@ -106,29 +107,34 @@ def generate_dagger_data(match: Match,
 
 
 def adjust_target_output(target_output: Tensor) -> Tensor:
-    return ((target_output
-             + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device))
-            * torch.tensor([1., 0.5, 1.], dtype=torch.float32).to(target_output.device))
-    # return (target_output
-    #         + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device)[None, :])
+    # return ((target_output
+    #          + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device))
+    #         * torch.tensor([1., 0.5, 1.], dtype=torch.float32).to(target_output.device))
+    return (target_output
+            + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device)[None, :])
 
 
 def adjust_model_output(model_output: Tensor, adjusted_target_output: Tensor) -> Tensor:
     # Set acceleration to 0 if target asks for braking, so that acceleration is not punished.
-    modifier = (adjusted_target_output[:, 2] != 0).detach().clone().type(torch.float32)
+    modifier = (adjusted_target_output[:, -1] != 0).detach().clone().type(torch.float32)
     model_accel = modifier * model_output[:, 0]
     return torch.cat([model_accel[:, None], model_output[:, 1:]], dim=-1)
 
 
 def get_loss_fn() -> Callable[[Tensor, Tensor], Tensor]:
-    total_loss_fn = torch.nn.BCEWithLogitsLoss()
+    accel_loss_fn = torch.nn.BCEWithLogitsLoss()
+    steer_loss_fn = torch.nn.CrossEntropyLoss()
+    brake_loss_fn = torch.nn.BCEWithLogitsLoss()
 
     def loss_fn(model_output: Tensor, target: Tensor) -> Tensor:
         adjusted_target = adjust_target_output(target)
         model_output = adjust_model_output(model_output, adjusted_target)
 
-        total_loss: Tensor = total_loss_fn(model_output, adjusted_target)
-        return total_loss
+        accel_loss: Tensor = accel_loss_fn(model_output[:, 0], adjusted_target[:, 0])
+        steer_loss: Tensor = steer_loss_fn(model_output[:, 1:4],
+                                           adjusted_target[:, 1].type(torch.long))
+        brake_loss: Tensor = brake_loss_fn(model_output[:, 4], adjusted_target[:, 2])
+        return accel_loss + steer_loss + brake_loss
 
     return loss_fn
 
@@ -164,20 +170,21 @@ def train(args: argparse.Namespace):
 
         dagger_model.eval()
         generated_dataset = generate_dagger_data(
-            match, dagger_model, target_model, opponents, i_epoch,
+            match, dagger_model, target_model, opponents, 5, i_epoch,
             args.video_epochs_interval, args.num_frames)
         dagger_model.train()
 
-        dataset = merge_datasets(
-            dataset,
-            # generate_data(match, 'jurgen_agent', dqn_player_model, 1, reward_criteria,
-            #               num_frames=args.num_frames, use_red_data=False, use_blue_data=True,
-            #              video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
-            # generate_data(match, dqn_player_model, 'jurgen_agent', 1, reward_criteria,
-            #               num_frames=args.num_frames, use_red_data=True, use_blue_data=False,
-            #               video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
-            generated_dataset
-        )
+        # dataset = merge_datasets(
+        #     dataset,
+        #     # generate_data(match, 'jurgen_agent', dqn_player_model, 1, reward_criteria,
+        #     #               num_frames=args.num_frames, use_red_data=False, use_blue_data=True,
+        #     #              video_path=get_video_path(i_epoch, args.video_epochs_interval, 'blue')),
+        #     # generate_data(match, dqn_player_model, 'jurgen_agent', 1, reward_criteria,
+        #     #               num_frames=args.num_frames, use_red_data=True, use_blue_data=False,
+        #     #               video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red')),
+        #     generated_dataset
+        # )
+        dataset = generated_dataset
         dataset.discard_to_max_size(args.max_dataset_size)
         data_loader = DataLoader(dataset, args.batch_size, shuffle=True)
 
@@ -191,11 +198,13 @@ def train(args: argparse.Namespace):
             action_batch = action_batch.to(device)
 
             model_output = dagger_model(state_batch)
-            model_p1_output = model_output[:, :3]
-            model_p2_output = model_output[:, 3:]
+            half_dim_size = model_output.size(-1) // 2
+            model_p1_output = model_output[:, :half_dim_size]
+            model_p2_output = model_output[:, half_dim_size:]
 
-            target_p1_output = action_batch[:, :3]
-            target_p2_output = action_batch[:, 3:]
+            half_dim_size = action_batch.size(-1) // 2
+            target_p1_output = action_batch[:, :half_dim_size]
+            target_p2_output = action_batch[:, half_dim_size:]
 
             batch_loss: Tensor = (loss_fn(model_p1_output, target_p1_output)
                                   + loss_fn(model_p2_output, target_p2_output))
