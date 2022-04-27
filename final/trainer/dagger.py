@@ -162,6 +162,8 @@ def train(args: argparse.Namespace):
         epoch_losses: List[Tensor] = []
         for state_batch, action_batch, _, _ in data_loader:
             state_batch: Tensor
+            action_batch: Tensor
+            action_batch = action_batch.to(device)
 
             model_output = dagger_model(state_batch)
             model_p1_output = model_output[:, :3]
