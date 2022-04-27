@@ -54,7 +54,7 @@ class DaggerModel(nn.Module):
 
         return torch.stack([
             torch.sigmoid(action_fragment[0])
-            if brake != 0 else torch.tensor(0., dtype=torch.float32).to(action_fragment.device),
+            if brake == 0 else torch.tensor(0., dtype=torch.float32).to(action_fragment.device),
             2 * torch.sigmoid(action_fragment[1]) - 1,
             torch.round(action_fragment[2])
         ])
