@@ -43,13 +43,13 @@ class ToHeatmap(object):
         self.radius = radius
 
     def __call__(self, image, *dets):
-        peak, size = detections_to_heatmap(dets, image.shape[1:], radius=self.radius)
-        return image, peak, size
+        peak = detections_to_heatmap(dets, image.shape[1:], radius=self.radius)
+        return image, peak
 
 
 def detections_to_heatmap(dets, shape, radius=2, device=None):
     with torch.no_grad():
-        size = torch.zeros((2, shape[0], shape[1]), device=device)
+        # size = torch.zeros((2, shape[0], shape[1]), device=device)
         peak = torch.zeros((len(dets), shape[0], shape[1]), device=device)
         for i, det in enumerate(dets):
             if len(det):
@@ -60,9 +60,9 @@ def detections_to_heatmap(dets, shape, radius=2, device=None):
                 gx = (-((x[:, None] - cx[None, :]) / radius)**2).exp()
                 gy = (-((y[:, None] - cy[None, :]) / radius)**2).exp()
                 gaussian, id = (gx[None] * gy[:, None]).max(dim=-1)
-                mask = gaussian > peak.max(dim=0)[0]
-                det_size = (det[:, 2:] - det[:, :2]).T / 2
-                size[:, mask] = det_size[:, id[mask]]
+                # mask = gaussian > peak.max(dim=0)[0]
+                # det_size = (det[:, 2:] - det[:, :2]).T / 2
+                # size[:, mask] = det_size[:, id[mask]]
                 peak[i] = gaussian
-        return peak, size
+        return peak
 

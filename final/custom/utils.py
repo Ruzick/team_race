@@ -4,10 +4,11 @@ from enum import IntEnum
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.transforms import functional as F
+import torch
 
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
-DATA_PATH = 'image_data'
+DATA_PATH = 'img_data'
 
 
 class DenseSuperTuxDataset(Dataset):
@@ -36,41 +37,92 @@ def load_dense_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwar
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
 
 
-from custom import dense_transforms
-
 class DetectionSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor(), min_size=20):
+    # def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor(), min_size=20):
+    #     from glob import glob
+    #     from os import path
+    #     self.files = [ ]
+    #     self.label = [ ]
+    #     self.transform = transform
+
+    #     for f in glob(path.join(dataset_path,'*.csv')):
+    #       self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
+
+    #     for seg_im_f in glob(path.join(dataset_path,'*_segmentation.png')):
+    #         self.files.append(seg_im_f.replace('_segmentation.png', ''))
+
+
+    # def __len__(self):
+    #     return len(self.files)
+
+    # def __getitem__(self, idx):
+    #     label = self.label[idx]
+    #     b = self.files[idx]
+    #     im = Image.open(b +".png")
+    #     # lbl = Image.open(b + '_segmentation.png')
+    #     # lbl = self.transform(lbl) #everything has to be a tensor
+    #     data = im, label #lbl
+    #     if self.transform is not None:
+    #         data = self.transform(*data)
+    #     return data
+    def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=20):
         from glob import glob
         from os import path
-        self.files = [ ]
-        self.label = [ ]
+        self.files = []
+        for im_f in glob(path.join(dataset_path, '*_segmentation.png')):
+            self.files.append(im_f.replace('_segmentation.png', ''))
         self.transform = transform
+        self.min_size = min_size
 
-        for f in glob(path.join(dataset_path,'*.csv')):
-          self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
-
-        for seg_im_f in glob(path.join(dataset_path,'*_segmentation.png')):
-            self.files.append(seg_im_f.replace('_segmentation.png', ''))
-
+    # def _filter(self, boxes):
+    #     if len(boxes) == 0:
+    #         return boxes
+    #     return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
-        label = self.label[idx]
+        import numpy as np
         b = self.files[idx]
-        im = Image.open(b +".png")
-        # lbl = Image.open(b + '_segmentation.png')
-        # lbl = self.transform(lbl) #everything has to be a tensor
-        data = im, label #lbl
+        im = Image.open(b + '.png')
+        nfo = np.load(b + '.npz')
+        data =im  ,np.int32(nfo['puck']) #np.int32(nfo['kart'])
         if self.transform is not None:
             data = self.transform(*data)
         return data
 
 
-
 def load_detection_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = DetectionSuperTuxDataset(dataset_path, **kwargs)
+    return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
+
+
+class PlannerSuperTuxDataset(Dataset):
+    def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor(), min_size=20):
+        from PIL import Image
+        from glob import glob
+        from os import path
+        self.data = [ ]
+        self.transform = transform
+
+        for f in glob(path.join(dataset_path,'*.csv')):
+            i =  Image.open(f.replace('.csv', '.png'))
+            i.load()
+            self.data.append((i, np.loadtxt(f, dtype=np.float32, delimiter=',')))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        data = self.data[idx]
+        data = self.transform(*data)
+        return data
+
+
+
+def load_planner_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
+    dataset = PlannerSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
 
 
@@ -270,6 +322,36 @@ class ConfusionMatrix(object):
     def per_class(self):
         return self.matrix / (self.matrix.sum(1, keepdims=True) + 1e-5)
 
+
+class PyTux:
+    _singleton = None
+
+    def __init__(self, screen_width=128, screen_height=96):
+        assert PyTux._singleton is None, "Cannot create more than one pytux object"
+        PyTux._singleton = self
+        self.config = pystk.GraphicsConfig.hd()
+        self.config.screen_width = screen_width
+        self.config.screen_height = screen_height
+        pystk.init(self.config)
+        self.k = None
+
+    @staticmethod
+    def _point_on_track(distance, track, offset=0.0):
+        """
+        Get a point at `distance` down the `track`. Optionally applies an offset after the track segment if found.
+        Returns a 3d coordinate
+        """
+        node_idx = np.searchsorted(track.path_distance[..., 1],
+                                   distance % track.path_distance[-1, 1]) % len(track.path_nodes)
+        d = track.path_distance[node_idx]
+        x = track.path_nodes[node_idx]
+        t = (distance + offset - d[0]) / (d[1] - d[0])
+        return x[1] * t + x[0] * (1 - t)
+
+    @staticmethod
+    def _to_image(x, proj, view):
+        p = proj @ view @ np.array(list(x) + [1])
+        return np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
 
 # if __name__ == '__main__':
 #     dataset = DenseSuperTuxDataset('dense_data/train', transform=dense_transforms.Compose(

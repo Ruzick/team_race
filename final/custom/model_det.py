@@ -93,7 +93,7 @@ class Detector(torch.nn.Module):
                 z = torch.cat([z, up_activation[i]], dim=1)
         return self.classifier(z)#, self.size(z)
 
-    def detect(self, image, player, **kwargs):
+    def detect(self, image, **kwargs):
         import numpy as np
         """
            Your code here.
@@ -129,22 +129,17 @@ class Detector(torch.nn.Module):
                 cx = puck[1]
                 cy = puck[2]
             #     current_list =[cx,cy]
-            # for each_object in current_list:
+            # for each_object in current_list: 
             #     print(each_object, 'each object')
             #     peaks_per_object.append(int(each_object[0]),int(each_object[1])) 
-            
+            #1) convert to 3d coordinates?
+            # 
 
         #     all_lists.append(peaks_per_object) #contains both 
         # print(puck)
 
-        #convert to normalize image
 
-            proj = np.array(state.players[i].camera.projection).T
-            view = np.array(state.players[i].camera.view).T
-            p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
-            aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
-
-        return  [cx,cy]#all_lists
+        return  [cx,cy]#all_lists  change this so that it returns batch size
 
         # cls, size = self.forward(image[None])
         # size = size.cpu()

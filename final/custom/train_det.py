@@ -31,24 +31,21 @@ def train(args):
 
     import inspect
     transform = eval(args.transform, {k: v for k, v in inspect.getmembers(dense_transforms) if inspect.isclass(v)})
-    train_data = load_detection_data('image_data', num_workers=4, transform=transform)
+    train_data = load_detection_data( num_workers=4, transform=transform)
 
     det_loss = torch.nn.BCEWithLogitsLoss(reduction='none')
-    size_loss = torch.nn.MSELoss(reduction='none')
 
     global_step = 0
     for epoch in range(args.num_epoch):
         model.train()
 
-        for img, loc in train_data:
+        for img, loc  in train_data:
             img = img.to(device)
-
-            print(img.size())
-            print('loc', loc.size()) #32x2  [-1,2]
-            # size_w, _ = gt_det.max(dim=1, keepdim=True)
-
+            loc = (loc).to(device)
             det = model.detect(img)
-            print('det', det) #32x1x200x300  32xclassxheightxwidth
+            print(img.size())
+            print('det', det) #32x1x200x300  32xclassxheightxwidth but i get a [123, 232]
+            print('loc', loc) #32x ]123,233]
             # Continuous version of focal loss
             p_det = torch.sigmoid(det * (1-2*loc))
             det_loss_val = (det_loss(det, loc)*p_det).mean() / p_det.mean()
@@ -95,7 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num_epoch', type=int, default=120)
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3)
     parser.add_argument('-c', '--continue_training', action='store_true')
-    parser.add_argument('-t', '--transform',default='Compose([ RandomHorizontalFlip(), ToTensor()])')
+    parser.add_argument('-t', '--transform',default='Compose([ ToTensor()   ] ) ') #, ToHeatmap(2)  ])')
     parser.add_argument('-w', '--size-weight', type=float, default=0.01)
 
     args = parser.parse_args()
