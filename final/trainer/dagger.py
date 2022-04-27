@@ -163,6 +163,7 @@ def train(args: argparse.Namespace):
         for state_batch, action_batch, _, _ in data_loader:
             state_batch: Tensor
             action_batch: Tensor
+            state_batch = state_batch.to(device)
             action_batch = action_batch.to(device)
 
             model_output = dagger_model(state_batch)
