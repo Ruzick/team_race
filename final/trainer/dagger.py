@@ -78,7 +78,8 @@ def generate_dagger_data(match: Match,
             use_red_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
-                i_epoch, video_epochs_interval, f'{opponent}-blue'))
+                i_epoch, video_epochs_interval, f'{opponent}-blue'),
+            verbose=False)
         for opponent in opponents
     ] + [
         generate_data(
@@ -86,7 +87,8 @@ def generate_dagger_data(match: Match,
             use_blue_data=False, num_frames=num_frames,
             state_to_tensor_fn=state_to_tensor_jurgen,
             video_path=get_video_path(
-                i_epoch, video_epochs_interval, f'{opponent}-red'))
+                i_epoch, video_epochs_interval, f'{opponent}-red'),
+            verbose=False)
         for opponent in opponents
     ]
 
@@ -194,6 +196,8 @@ def train(args: argparse.Namespace):
             best_epoch_loss = epoch_loss
             print(f'New best epoch loss: {best_epoch_loss}')
             save_dagger_player_model(dagger_model, i_epoch)
+
+        save_dagger_player_model(dagger_model)
 
     dagger_model.eval()
     save_dagger_player_model(dagger_model)

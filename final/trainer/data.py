@@ -114,7 +114,8 @@ def generate_data(match: Match,
                   initial_ball_location: Optional[Tuple[float, float]] = None,
                   initial_ball_velocity: Optional[Tuple[float, float]] = None,
                   state_to_tensor_fn: Optional[Callable[[int, List[dict], List[dict], dict],
-                                                        Tensor]] = None
+                                                        Tensor]] = None,
+                  verbose: bool = True,
                   ) -> FramesDataset:
 
     if not use_red_data and not use_blue_data:
@@ -132,7 +133,7 @@ def generate_data(match: Match,
     else:
         team2_runner = TeamRunner(Team(team_or_dir2, state_to_tensor_fn))
 
-    if video_path is not None:
+    if verbose and video_path is not None:
         print(f'Starting video recording to {video_path}')
     matches_data = [
         play_match(match, team1_runner, team2_runner, video_path if i_match == 0 else None,
