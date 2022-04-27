@@ -1,6 +1,6 @@
 import argparse
 from os import path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import torch
 import torch.utils.tensorboard as tb
@@ -109,6 +109,28 @@ def adjust_target_output(target_output: Tensor) -> Tensor:
     return ((target_output
              + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device))
             * torch.tensor([1., 0.5, 1.], dtype=torch.float32).to(target_output.device))
+    # return (target_output
+    #         + torch.tensor([0., 1., 0.], dtype=torch.float32).to(target_output.device)[None, :])
+
+
+def adjust_model_output(model_output: Tensor, adjusted_target_output: Tensor) -> Tensor:
+    # Set acceleration to 0 if target asks for braking, so that acceleration is not punished.
+    modifier = (adjusted_target_output[:, 2] != 0).detach().clone().type(torch.float32)
+    model_accel = modifier * model_output[:, 0]
+    return torch.cat([model_accel[:, None], model_output[:, 1:]], dim=-1)
+
+
+def get_loss_fn() -> Callable[[Tensor, Tensor], Tensor]:
+    total_loss_fn = torch.nn.BCEWithLogitsLoss()
+
+    def loss_fn(model_output: Tensor, target: Tensor) -> Tensor:
+        adjusted_target = adjust_target_output(target)
+        model_output = adjust_model_output(model_output, adjusted_target)
+
+        total_loss: Tensor = total_loss_fn(model_output, adjusted_target)
+        return total_loss
+
+    return loss_fn
 
 
 def train(args: argparse.Namespace):
@@ -125,7 +147,7 @@ def train(args: argparse.Namespace):
     dagger_model: ScriptModule = dagger_model_generator().to(device)
     target_model: ScriptModule = load_jurgen_model().to(device)
 
-    dagger_loss = torch.nn.BCEWithLogitsLoss()
+    loss_fn = get_loss_fn()
 
     dagger_optimizer = torch.optim.Adam(dagger_model.parameters())
 
@@ -172,11 +194,11 @@ def train(args: argparse.Namespace):
             model_p1_output = model_output[:, :3]
             model_p2_output = model_output[:, 3:]
 
-            target_p1_output = adjust_target_output(action_batch[:, :3])
-            target_p2_output = adjust_target_output(action_batch[:, 3:])
+            target_p1_output = action_batch[:, :3]
+            target_p2_output = action_batch[:, 3:]
 
-            batch_loss: Tensor = (dagger_loss(model_p1_output, target_p1_output)
-                                  + dagger_loss(model_p2_output, target_p2_output))
+            batch_loss: Tensor = (loss_fn(model_p1_output, target_p1_output)
+                                  + loss_fn(model_p2_output, target_p2_output))
 
             dagger_optimizer.zero_grad()
             batch_loss.backward()

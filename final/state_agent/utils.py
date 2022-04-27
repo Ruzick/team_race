@@ -95,34 +95,34 @@ def get_kart_tensor_jurgen(kart_state: dict, ball_center: Tensor) -> Tensor:
         dtype=torch.float32)
 
 
-def state_to_tensor_jurgen_by_player(team_id: int,
-                                     player_state: dict,
-                                     _: List[dict],  # opponent_state
-                                     soccer_state: dict,
-                                     ) -> Tensor:
+def extract_featuresV2(pstate, soccer_state, _, team_id):
+    # features of ego-vehicle
+    kart_front = torch.tensor(pstate['kart']['front'], dtype=torch.float32)[[0, 2]]
+    kart_center = torch.tensor(pstate['kart']['location'], dtype=torch.float32)[[0, 2]]
+    kart_direction = (kart_front-kart_center) / torch.norm(kart_front-kart_center)
+    kart_angle = torch.atan2(kart_direction[1], kart_direction[0])
 
-    # features of soccer ball
-    ball_center = torch.tensor(soccer_state['ball']['location'], dtype=torch.float32)[[0, 2]]
+    # features of soccer
+    puck_center = torch.tensor(soccer_state['ball']['location'], dtype=torch.float32)[[0, 2]]
+    kart_to_puck_direction = (puck_center - kart_center) / torch.norm(puck_center-kart_center)
+    kart_to_puck_angle = torch.atan2(kart_to_puck_direction[1], kart_to_puck_direction[0])
 
-    # features of goal-lines
-    attacking_goal_center = torch.tensor(
-        soccer_state['goal_line'][(team_id + 1) % 2],
-        dtype=torch.float32
+    kart_to_puck_angle_difference = limit_period((kart_angle - kart_to_puck_angle) / torch.pi)
+
+    # features of score-line
+    goal_line_center = torch.tensor(
+        soccer_state['goal_line'][(team_id+1) % 2], dtype=torch.float32
     )[:, [0, 2]].mean(dim=0)
-    ball_to_goal_direction = (attacking_goal_center - ball_center)
-    ball_to_goal_unit_vector = ball_to_goal_direction / torch.linalg.norm(ball_to_goal_direction)
 
-    # features of karts
-    kart_tensor = get_kart_tensor_jurgen(player_state['kart'], ball_center)
-    kart_to_ball_angle_difference = limit_period((kart_tensor[2] - kart_tensor[3]) / torch.pi)
+    puck_to_goal_line = (goal_line_center-puck_center) / torch.norm(goal_line_center-puck_center)
 
-    return torch.tensor([
-        *kart_tensor,
-        *attacking_goal_center,
-        kart_to_ball_angle_difference,
-        *ball_center,
-        *ball_to_goal_unit_vector
+    features = torch.tensor([
+        kart_center[0], kart_center[1], kart_angle, kart_to_puck_angle,
+        goal_line_center[0], goal_line_center[1], kart_to_puck_angle_difference,
+        puck_center[0], puck_center[1], puck_to_goal_line[0], puck_to_goal_line[1]
     ], dtype=torch.float32)
+
+    return features
 
 
 def state_to_tensor_jurgen(team_id: int,
@@ -131,7 +131,7 @@ def state_to_tensor_jurgen(team_id: int,
                            soccer_state: dict,
                            ) -> Tensor:
     result = torch.cat([
-        state_to_tensor_jurgen_by_player(team_id, player_state, opponent_state, soccer_state)
+        extract_featuresV2(player_state, soccer_state, opponent_state, team_id)
         for player_state in team_state
     ])
     return result
