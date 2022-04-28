@@ -6,6 +6,19 @@ from torchvision import transforms as T
 from torchvision.transforms import functional as F
 
 
+class RectifyData(object):
+    def __call__(self, image, *dets):
+        # Note: There are some issues with the dimensions of labels with one entry
+        rectified = []
+        for det in dets:
+            if det.ndim == 1:
+                det = np.expand_dims(det, axis=0)
+            rectified.append(det)
+        rectified = tuple(rectified)
+
+        return (image,) + rectified
+
+
 class RandomHorizontalFlip(object):
     def __init__(self, flip_prob=0.5):
         self.flip_prob = flip_prob
@@ -13,8 +26,8 @@ class RandomHorizontalFlip(object):
     def __call__(self, image, *args):
         if random.random() < self.flip_prob:
             image = F.hflip(image)
-            args = tuple(np.array([-point[0], point[1]],
-                         dtype=point.dtype) for point in args)
+            args = tuple(np.array([(point[0], image.width - point[1])
+                         for point in points]) for points in args)
         return (image,) + args
 
 
@@ -86,10 +99,7 @@ def centers_to_heatmap(dets, shape, radius=2, device=None):
                 det = torch.tensor(det.astype(
                     float), dtype=torch.float32, device=device)
 
-                # Note: There are some issues with the dimensions of labels with one entry
-                if det.ndim == 1:
-                    det = torch.unsqueeze(det, dim=0)
-
+                # Note:  data is in (y,x) form
                 cx, cy = det[:, 1], det[:, 0]
                 x = torch.arange(shape[1], dtype=cx.dtype, device=cx.device)
                 y = torch.arange(shape[0], dtype=cy.dtype, device=cy.device)

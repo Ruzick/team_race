@@ -155,21 +155,23 @@ def train(args):
 
     # Load data for training
     train_transforms = dense_transforms.Compose([
-        # dense_transforms.RandomHorizontalFlip(),
+        dense_transforms.RectifyData(),
+        dense_transforms.RandomHorizontalFlip(),
         dense_transforms.ColorJitter(
             brightness=0.6, contrast=0.4, saturation=0.4, hue=0.2),
         dense_transforms.ToTensor(),
         dense_transforms.CenterToHeatmap(),
     ])
     val_transforms = dense_transforms.Compose([
+        dense_transforms.RectifyData(),
         dense_transforms.ToTensor(),
         dense_transforms.CenterToHeatmap(),
     ])
 
     train_data = load_detection_data(
-        str(args.train), batch_size=args.batch_size, transform=train_transforms)
+        str(args.train), num_workers=4, batch_size=args.batch_size, transform=train_transforms)
     val_data = load_detection_data(
-        str(args.val), batch_size=args.batch_size, transform=val_transforms)
+        str(args.val), num_workers=4, batch_size=args.batch_size, transform=val_transforms)
 
     # Create and run trainer
     t = Trainer(
@@ -183,18 +185,37 @@ def train(args):
     t.run(train_data, val_data)
 
 
-def overlay_heatmap(x, heatmap, alpha_threshold=0.1):
-    background = TVF.to_pil_image(x.to('cpu'))  # assuming your image in x
-
-    alpha = torch.sigmoid(torch.unsqueeze(heatmap.sum(dim=0), 0))
+def overlay_heatmap(img, heatmap):
+    ''' Overlay heatmap onto image '''
+    # alpha = torch.clamp(torch.unsqueeze(heatmap.sum(dim=0), 0), min=0, max=1)
+    # alpha = torch.sigmoid(torch.unsqueeze(heatmap.sum(dim=0), 0))
+    alpha_threshold = 0.3
+    hm_weight = 2.5
+    alpha = torch.clamp(hm_weight * heatmap.sum(dim=0),
+                        min=0, max=1).unsqueeze(0)
+    alpha[alpha > 1 - alpha_threshold] = 1
     alpha[alpha < alpha_threshold] = 0
     hm_alpha = torch.cat((heatmap, alpha), dim=0)
-    foreground = TVF.to_pil_image(hm_alpha.to('cpu')).convert("RGBA")
 
+    foreground = TVF.to_pil_image(hm_alpha.to('cpu'))
+    background = TVF.to_pil_image(img.to('cpu'))
     background.paste(foreground, (0, 0), foreground)
     overlay_tensor = TVF.to_tensor(background)
 
     return overlay_tensor
+
+
+def pad_to_rgb(x):
+    '''Pad so that tensor can be converted to RGB image'''
+    if x.size(1) >= 3:
+        return x
+
+    blank = torch.zeros_like(x[:, 0, :, :]).unsqueeze(1)
+    repeat_along = torch.ones(len(x.size()))
+    repeat_along[1] = 3 - x.size(1)
+    repeat_along = [int(f) for f in repeat_along.tolist()]
+    blank_channels = blank.repeat(*repeat_along)
+    return torch.cat((x, blank_channels), dim=1)
 
 
 def log(logger, imgs, gt_det, det, global_step):
@@ -208,34 +229,18 @@ def log(logger, imgs, gt_det, det, global_step):
 
     device = imgs.get_device()
 
-    def pad_to_rgb(x):
-        '''Pad so that tensor can be converted to RGB image'''
-        blank = torch.zeros_like(x[:, 0, :, :]).unsqueeze(1)
-        repeat_along = torch.ones(len(x.size()))
-        repeat_along[1] = 3 - gt_det.size(1)
-        repeat_along = [int(f) for f in repeat_along.tolist()]
-        blank_channels = blank.repeat(*repeat_along)
-        return torch.cat((x, blank_channels), dim=1)
-
-    # Pad with blank channels if not enough to be an RGB image
-    if gt_det.size(1) < 3:
-        gt_det = pad_to_rgb(gt_det)
-
     # Ground truth
+    gt_det = pad_to_rgb(gt_det)
     logger.add_images('image', imgs[:16], global_step)
     logger.add_images('label', gt_det[:16], global_step)
 
     # Heatmaps
     normalized_detects = torch.sigmoid(det[:16])
-    # print(normalized_detects.shape)
-    if normalized_detects.size(1) < 3:
-        normalized_detects = pad_to_rgb(normalized_detects)
-    # print(normalized_detects.shape)
+    normalized_detects = pad_to_rgb(normalized_detects)
 
     overlays = torch.stack([overlay_heatmap(x, y)
                             for x, y in zip(imgs[:16], normalized_detects)]).to(device)
-    # print(overlays.shape)
-    # logger.add_images('pred', normalized_detects, global_step)
+    logger.add_images('pred', normalized_detects, global_step)
     logger.add_images('overlay', overlays, global_step)
 
 
