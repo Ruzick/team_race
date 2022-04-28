@@ -12,7 +12,7 @@ DATA_PATH = 'img_data'
 
 
 class DenseSuperTuxDataset(Dataset):
-    def __init__(self, dataset_path = DATA_PATH , transform=dense_transforms.ToTensor()):
+    def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor()):
         from glob import glob
         from os import path
         self.files = []
@@ -25,12 +25,12 @@ class DenseSuperTuxDataset(Dataset):
 
     def __getitem__(self, idx):
         b = self.files[idx]
-        print(b)
         im = Image.open(b + '.png')
         lbl = Image.open(b + '_segmentation.png')
         if self.transform is not None:
             im, lbl = self.transform(im, lbl)
         return im, lbl
+
 
 def load_dense_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = DenseSuperTuxDataset(dataset_path, **kwargs)
@@ -38,33 +38,7 @@ def load_dense_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwar
 
 
 class DetectionSuperTuxDataset(Dataset):
-    # def __init__(self, dataset_path=DATA_PATH, transform=dense_transforms.ToTensor(), min_size=20):
-    #     from glob import glob
-    #     from os import path
-    #     self.files = [ ]
-    #     self.label = [ ]
-    #     self.transform = transform
 
-    #     for f in glob(path.join(dataset_path,'*.csv')):
-    #       self.label.append(np.loadtxt(f, dtype=np.float32, delimiter=','))
-
-    #     for seg_im_f in glob(path.join(dataset_path,'*_segmentation.png')):
-    #         self.files.append(seg_im_f.replace('_segmentation.png', ''))
-
-
-    # def __len__(self):
-    #     return len(self.files)
-
-    # def __getitem__(self, idx):
-    #     label = self.label[idx]
-    #     b = self.files[idx]
-    #     im = Image.open(b +".png")
-    #     # lbl = Image.open(b + '_segmentation.png')
-    #     # lbl = self.transform(lbl) #everything has to be a tensor
-    #     data = im, label #lbl
-    #     if self.transform is not None:
-    #         data = self.transform(*data)
-    #     return data
     def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=20):
         from glob import glob
         from os import path
@@ -74,11 +48,6 @@ class DetectionSuperTuxDataset(Dataset):
         self.transform = transform
         self.min_size = min_size
 
-    # def _filter(self, boxes):
-    #     if len(boxes) == 0:
-    #         return boxes
-    #     return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
-
     def __len__(self):
         return len(self.files)
 
@@ -87,7 +56,7 @@ class DetectionSuperTuxDataset(Dataset):
         b = self.files[idx]
         im = Image.open(b + '.png')
         nfo = np.load(b + '.npz')
-        data =im  ,np.int32(nfo['puck']) #np.int32(nfo['kart'])
+        data = im, nfo['kart'], nfo['puck']
         if self.transform is not None:
             data = self.transform(*data)
         return data
@@ -103,13 +72,14 @@ class PlannerSuperTuxDataset(Dataset):
         from PIL import Image
         from glob import glob
         from os import path
-        self.data = [ ]
+        self.data = []
         self.transform = transform
 
-        for f in glob(path.join(dataset_path,'*.csv')):
-            i =  Image.open(f.replace('.csv', '.png'))
+        for f in glob(path.join(dataset_path, '*.csv')):
+            i = Image.open(f.replace('.csv', '.png'))
             i.load()
-            self.data.append((i, np.loadtxt(f, dtype=np.float32, delimiter=',')))
+            self.data.append(
+                (i, np.loadtxt(f, dtype=np.float32, delimiter=',')))
 
     def __len__(self):
         return len(self.data)
@@ -120,11 +90,9 @@ class PlannerSuperTuxDataset(Dataset):
         return data
 
 
-
 def load_planner_data(dataset_path=DATA_PATH, num_workers=0, batch_size=32, **kwargs):
     dataset = PlannerSuperTuxDataset(dataset_path, **kwargs)
     return DataLoader(dataset, num_workers=num_workers, batch_size=batch_size, shuffle=True, drop_last=True)
-
 
 
 class Team(IntEnum):
@@ -150,20 +118,24 @@ def map_image(team1_state, team2_state, soccer_state, resolution=512, extent=65,
     BLUE_COLOR = (0x20, 0x4a, 0x87)
     BALL_COLOR = (0x2e, 0x34, 0x36)
     from PIL import Image, ImageDraw
-    r = Image.new('RGB', (resolution*anti_alias, resolution*anti_alias), BG_COLOR)
+    r = Image.new('RGB', (resolution*anti_alias,
+                  resolution*anti_alias), BG_COLOR)
 
     def _to_coord(x):
         return resolution * anti_alias * (x + extent) / (2 * extent)
 
     draw = ImageDraw.Draw(r)
     # Let's draw the goal line
-    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][0]], width=5*anti_alias, fill=RED_COLOR)
-    draw.line([(_to_coord(x), _to_coord(y)) for x, _, y in soccer_state['goal_line'][1]], width=5*anti_alias, fill=BLUE_COLOR)
+    draw.line([(_to_coord(x), _to_coord(y)) for x, _,
+              y in soccer_state['goal_line'][0]], width=5*anti_alias, fill=RED_COLOR)
+    draw.line([(_to_coord(x), _to_coord(y)) for x, _,
+              y in soccer_state['goal_line'][1]], width=5*anti_alias, fill=BLUE_COLOR)
 
     # and the ball
     x, _, y = soccer_state['ball']['location']
     s = soccer_state['ball']['size']
-    draw.ellipse((_to_coord(x-s), _to_coord(y-s), _to_coord(x+s), _to_coord(y+s)), width=2*anti_alias, fill=BALL_COLOR)
+    draw.ellipse((_to_coord(x-s), _to_coord(y-s), _to_coord(x+s),
+                 _to_coord(y+s)), width=2*anti_alias, fill=BALL_COLOR)
 
     # and karts
     for c, s in [(BLUE_COLOR, team1_state), (RED_COLOR, team2_state)]:
@@ -172,8 +144,10 @@ def map_image(team1_state, team2_state, soccer_state, resolution=512, extent=65,
             fx, _, fy = k['kart']['front']
             sx, _, sy = k['kart']['size']
             s = (sx+sy) / 2
-            draw.ellipse((_to_coord(x - s), _to_coord(y - s), _to_coord(x + s), _to_coord(y + s)), width=5*anti_alias, fill=c)
-            draw.line((_to_coord(x), _to_coord(y), _to_coord(x+(fx-x)*2), _to_coord(y+(fy-y)*2)), width=4*anti_alias, fill=0)
+            draw.ellipse((_to_coord(x - s), _to_coord(y - s), _to_coord(x + s),
+                         _to_coord(y + s)), width=5*anti_alias, fill=c)
+            draw.line((_to_coord(x), _to_coord(y), _to_coord(x+(fx-x)*2),
+                      _to_coord(y+(fy-y)*2)), width=4*anti_alias, fill=0)
 
     if anti_alias == 1:
         return r
@@ -205,6 +179,7 @@ class VideoRecorder(BaseRecorder):
     """
         Produces pretty output videos
     """
+
     def __init__(self, video_file):
         import imageio
         self._writer = imageio.get_writer(video_file, fps=20)
@@ -215,7 +190,8 @@ class VideoRecorder(BaseRecorder):
                                                          'Blue: %d' % soccer_state['score'][1],
                                                          'Red: %d' % soccer_state['score'][0])))
         else:
-            self._writer.append_data(np.array(map_image(team1_state, team2_state, soccer_state)))
+            self._writer.append_data(
+                np.array(map_image(team1_state, team2_state, soccer_state)))
 
     def __del__(self):
         if hasattr(self, '_writer'):
@@ -228,7 +204,8 @@ class DataRecorder(BaseRecorder):
         self._data = []
 
     def __call__(self, team1_state, team2_state, soccer_state, actions, team1_images=None, team2_images=None):
-        data = dict(team1_state=team1_state, team2_state=team2_state, soccer_state=soccer_state, actions=actions)
+        data = dict(team1_state=team1_state, team2_state=team2_state,
+                    soccer_state=soccer_state, actions=actions)
         if self._record_images:
             data['team1_images'] = team1_images
             data['team2_images'] = team2_images
@@ -248,7 +225,8 @@ class StateRecorder(BaseRecorder):
 
     def __call__(self, team1_state, team2_state, soccer_state, actions, team1_images=None, team2_images=None):
         from pickle import dump
-        data = dict(team1_state=team1_state, team2_state=team2_state, soccer_state=soccer_state, actions=actions)
+        data = dict(team1_state=team1_state, team2_state=team2_state,
+                    soccer_state=soccer_state, actions=actions)
         if self._record_images:
             data['team1_images'] = team1_images
             data['team2_images'] = team2_images
@@ -277,7 +255,8 @@ def _one_hot(x, n):
 class ConfusionMatrix(object):
     def _make(self, preds, labels):
         label_range = torch.arange(self.size, device=preds.device)[None, :]
-        preds_one_hot, labels_one_hot = _one_hot(preds, self.size), _one_hot(labels, self.size)
+        preds_one_hot, labels_one_hot = _one_hot(
+            preds, self.size), _one_hot(labels, self.size)
         return (labels_one_hot[:, :, None] * preds_one_hot[:, None, :]).sum(dim=0).detach()
 
     def __init__(self, size=5):
@@ -356,8 +335,8 @@ class PyTux:
 # if __name__ == '__main__':
 #     dataset = DenseSuperTuxDataset('dense_data/train', transform=dense_transforms.Compose(
 #         [
-        
-#         dense_transforms.RandomHorizontalFlip(), 
+
+#         dense_transforms.RandomHorizontalFlip(),
 
 #         dense_transforms.ToTensor(),
 #         dense_transforms.Normalize([0.32352477, 0.3310059 , 0.34449455], [0.25328732, 0.22241966, 0.24833776])
