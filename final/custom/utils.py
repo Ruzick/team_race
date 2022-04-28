@@ -74,11 +74,10 @@ class DetectionSuperTuxDataset(Dataset):
         self.transform = transform
         self.min_size = min_size
 
-    def _filter(self, boxes):
-        if len(boxes) == 0:
-            return boxes
-        # return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
-        return boxes[abs(boxes[:,1]) +abs( boxes[:,2]) >= self.min_size]
+    # def _filter(self, boxes):
+    #     if len(boxes) == 0:
+    #         return boxes
+    #     return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
 
     def __len__(self):
         return len(self.files)
@@ -88,7 +87,7 @@ class DetectionSuperTuxDataset(Dataset):
         b = self.files[idx]
         im = Image.open(b + '.png')
         nfo = np.load(b + '.npz')
-        data =im  , self._filter(np.int32(nfo['puck'])) ,self._filter(np.int32(nfo['kart']))
+        data =im  , nfo['puck'] ,nfo['kart']
         # print( np.int32(nfo['kart']), np.int32(nfo['puck']))
         if self.transform is not None:
             data = self.transform(*data)

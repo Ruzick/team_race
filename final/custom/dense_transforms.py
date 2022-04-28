@@ -61,9 +61,41 @@ def detections_to_heatmap(dets, shape, radius=2, device=None):
                 gx = (-((x[:, None] - cx[None, :]) / radius)**2).exp()
                 gy = (-((y[:, None] - cy[None, :]) / radius)**2).exp()
                 gaussian, id = (gx[None] * gy[:, None]).max(dim=-1)
-                mask = gaussian > peak.max(dim=0)[0]
+                # mask = gaussian > peak.max(dim=0)[0]
                 # det_size = (det[:, 2:] - det[:, :2]).T / 2
                 # size[:, mask] = det_size[:, id[mask]]
+                peak[i] = gaussian
+        return peak
+
+        
+
+class CenterToHeatmap(object):
+    def __init__(self, radius=2) -> None:
+        self.radius = radius
+
+    def __call__(self, image, *dets):
+        peak = centers_to_heatmap(dets, image.shape[1:], radius=self.radius)
+        return image, peak
+
+
+def centers_to_heatmap(dets, shape, radius=2, device=None):
+    with torch.no_grad():
+        peak = torch.zeros((len(dets), shape[0], shape[1]), device=device)
+        for i, det in enumerate(dets):
+            if len(det):
+                det = torch.tensor(det.astype(
+                    float), dtype=torch.float32, device=device)
+
+                # Note: There are some issues with the dimensions of labels with one entry
+                if det.ndim == 1:
+                    det = torch.unsqueeze(det, dim=0)
+
+                cx, cy = det[:, 0], det[:, 1]
+                x = torch.arange(shape[1], dtype=cx.dtype, device=cx.device)
+                y = torch.arange(shape[0], dtype=cy.dtype, device=cy.device)
+                gx = (-((x[:, None] - cx[None, :]) / radius)**2).exp()
+                gy = (-((y[:, None] - cy[None, :]) / radius)**2).exp()
+                gaussian, id = (gx[None] * gy[:, None]).max(dim=-1)
                 peak[i] = gaussian
         return peak
 

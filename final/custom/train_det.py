@@ -42,16 +42,12 @@ def train(args):
         for img, loc  in train_data:
             img = img.to(device)
             loc = (loc).to(device)
-            det = model.detect(img)
-            print(img.size())  #torch.Size([32, 3, 300, 400])
-            print('det', det) #32x1x200x300  32xclassxheightxwidth b
-            print('loc', loc) #32x ]123,233]
-            print('len', len(det[0]))
+            det = model(img)
             # Continuous version of focal loss
             p_det = torch.sigmoid(det * (1-2*loc))
             det_loss_val = (det_loss(det, loc)*p_det).mean() / p_det.mean()
             # size_loss_val = (size_w * size_loss(size, gt_size)).mean() / size_w.mean()
-            loss_val = det_loss_val  * args.size_weight
+            loss_val = det_loss_val # * args.size_weight
 
             if train_logger is not None and global_step % 100 == 0:
                 log(train_logger, img, loc, det, global_step)
@@ -59,18 +55,16 @@ def train(args):
             if train_logger is not None:
                 train_logger.add_scalar('det_loss', det_loss_val, global_step)
                 # train_logger.add_scalar('size_loss', size_loss_val, global_step)
-                train_logger.add_scalar('loss', loss_val, global_step)
+                # train_logger.add_scalar('loss', loss_val, global_step)
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
             global_step += 1
 
-        if valid_logger is None or train_logger is None:
-            print('epoch %-3d' %
-                  (epoch))
+        print('epoch %-3d' %(epoch), 'loss %-3d'%(loss_val))
         save_model(model)
 
-def log(logger, imgs, gt_det, det, global_step):
+def log(logger, imgs, loc, det, global_step):
     """
     logger: train_logger/valid_logger
     imgs: image tensor from data loader
@@ -78,9 +72,9 @@ def log(logger, imgs, gt_det, det, global_step):
     det: predicted object-center heatmaps
     global_step: iteration
     """
-    logger.add_images('image', imgs[:16], global_step)
-    logger.add_images('label', gt_det[:16], global_step)
-    logger.add_images('pred', torch.sigmoid(det[:16]), global_step)
+    logger.add_images('image', imgs, global_step)
+    # logger.add_images('label', loc, global_step)
+    # logger.add_images('pred', torch.sigmoid(det), global_step)
 
 
 if __name__ == '__main__':
@@ -93,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num_epoch', type=int, default=120)
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3)
     parser.add_argument('-c', '--continue_training', action='store_true')
-    parser.add_argument('-t', '--transform',default='Compose([ ToTensor()  ])')
+    parser.add_argument('-t', '--transform',default='Compose([ ToTensor() , CenterToHeatmap()  ])')
     parser.add_argument('-w', '--size-weight', type=float, default=0.01)
 
     args = parser.parse_args()
