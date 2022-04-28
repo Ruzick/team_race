@@ -90,7 +90,7 @@ def centers_to_heatmap(dets, shape, radius=2, device=None):
                 if det.ndim == 1:
                     det = torch.unsqueeze(det, dim=0)
 
-                cx, cy = det[:, 0], det[:, 1]
+                cx, cy = det[:, 1], det[:, 0]
                 x = torch.arange(shape[1], dtype=cx.dtype, device=cx.device)
                 y = torch.arange(shape[0], dtype=cy.dtype, device=cy.device)
                 gx = (-((x[:, None] - cx[None, :]) / radius)**2).exp()
