@@ -4,8 +4,9 @@ from typing import Optional
 
 import torch
 import torch.utils.tensorboard as tb
-from state_agent.ddqn_model import DQNModel, DQNPlayerModel
-from state_agent.utils import copy_parameters, load_model, save_model, state_to_tensor
+from state_agent.ddqn_model import DQNModel, DQNNoOpModel, DQNPlayerModel
+from state_agent.utils import (copy_parameters, load_model, save_model,
+                               state_to_tensor_ddqn)
 from torch import Tensor
 from torch.jit import ScriptModule
 from torch.utils.data import DataLoader
@@ -86,6 +87,7 @@ def train(args: argparse.Namespace):
 
     dqn_model: ScriptModule = dqn_model_generator().to(device)
     dqn_player_model: ScriptModule = torch.jit.script(DQNPlayerModel(dqn_model))
+    noop_player_model: ScriptModule = torch.jit.script(DQNNoOpModel())
 
     target_dqn_model: ScriptModule = dqn_model_generator().to(device)
     copy_parameters(dqn_model, target_dqn_model)
@@ -95,10 +97,10 @@ def train(args: argparse.Namespace):
 
     dqn_optimizer = torch.optim.Adam(dqn_model.parameters())
 
-    dataset = FramesDataset(state_to_tensor)
+    dataset = FramesDataset(state_to_tensor_ddqn)
 
-    reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST,
-                                     RewardCriterion.SCORE)
+    reward_criteria = RewardCriteria(RewardCriterion.DDQN_CUSTOM)
+
     match = Match()
 
     global_step: int = 0
@@ -112,9 +114,10 @@ def train(args: argparse.Namespace):
             dqn_player_model.epsilon = args.epsilon
 
         generated_dataset = generate_data(
-            match, dqn_player_model, dqn_player_model, 1, reward_criteria,
+            match, dqn_player_model, noop_player_model, 1, reward_criteria,
             num_frames=args.num_frames,
-            video_path=get_video_path(i_epoch, args.video_epochs_interval, 'both'))
+            state_to_tensor_fn=state_to_tensor_ddqn,
+            video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red'))
         mean_generated_reward = torch.tensor([
             data_entry[2] for data_entry in generated_dataset.data
         ]).mean()

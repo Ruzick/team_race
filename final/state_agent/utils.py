@@ -75,12 +75,28 @@ def state_to_tensor(team_id: int,
 
     features_tensor = torch.cat(
         [
-            torch.tensor([team_id], dtype=torch.float32),  # 1 dim
-            *goal_tensors,  # 2 goals * (angle, dist) -> 4 dim
-            *kart_tensors,  # 4 players * (kart angle, kart to ball angle, ball dist) -> 12 dim
+            # 1 dim
+            torch.tensor([team_id], dtype=torch.float32),
+            # 2 goals * (angle, dist) -> 4 dim
+            *goal_tensors,
+            # 4 players * (kart angle, signed speed, kart to ball angle, ball dist) -> 16 dim
+            *kart_tensors,
         ])
 
     return features_tensor
+
+
+def state_to_tensor_ddqn(team_id: int,
+                         player_state: List[dict],
+                         opponent_state: List[dict],
+                         soccer_state: dict,
+                         ) -> Tensor:
+    full_features_tensor = state_to_tensor(team_id, player_state, opponent_state, soccer_state)
+    if full_features_tensor.size(-1) != 21:
+        raise RuntimeError(f'Unexpected tensor shape {full_features_tensor.shape} given for DDQN') 
+
+    # Remove information of opponent karts
+    return full_features_tensor[..., :13]
 
 
 def get_kart_tensor_jurgen(kart_state: dict, ball_center: Tensor) -> Tensor:

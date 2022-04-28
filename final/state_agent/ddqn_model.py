@@ -18,7 +18,13 @@ class DQNModel(nn.Module):
         super().__init__()
         # TODO: Choose a decent network architecture
         self.network = torch.nn.Sequential(
-            torch.nn.Linear(22, 128),
+            torch.nn.Linear(18, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, 256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, 128),
             torch.nn.ReLU(),
             torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
@@ -33,7 +39,7 @@ class DQNModel(nn.Module):
         original_device = input_tensor.device
         input_tensor = torch.atleast_2d(input_tensor.to(self.device))
 
-        if input_tensor.size(-1) == 23:
+        if input_tensor.size(-1) == 19:
             # Input actions have not been made discrete, do this now
             input_tensor = self.make_input_action_discrete(input_tensor)
 
@@ -56,25 +62,27 @@ class DQNModel(nn.Module):
 
     @staticmethod
     def make_input_action_discrete(input_tensor: Tensor) -> Tensor:
-        assert input_tensor.size(-1) == 23, \
+        assert input_tensor.size(-1) == 19, \
             f'Input tensor size {input_tensor.shape} does not match expected size'
+
+        action_first_index = input_tensor.size(-1) - 6
 
         action_extraction_info = [
             # (13, -100000, 0.5),
-            (13, 0.5, 100000),    # P1 accelerate
-            (14, -100000, -0.5),  # P1 turn left
+            (action_first_index + 0, 0.5, 100000),    # P1 accelerate
+            (action_first_index + 1, -100000, -0.5),  # P1 turn left
             # (14, -0.5, 0.5),
-            (14, 0.5, 100000),    # P1 turn right
+            (action_first_index + 1, 0.5, 100000),    # P1 turn right
             # (15, -100000, 0.5),
             # (15, 0.5, 100000),    # P1 brake
             # (16, -100000, 0.5),
-            (16, 0.5, 100000),    # P2 accelerate
-            (17, -100000, -0.5),  # P2 turn left
+            (action_first_index + 3, 0.5, 100000),    # P2 accelerate
+            (action_first_index + 4, -100000, -0.5),  # P2 turn left
             # (17, -0.5, 0.5),
-            (17, 0.5, 100000),    # P2 turn right
+            (action_first_index + 4, 0.5, 100000),    # P2 turn right
             # (18, -100000, 0.5),
             # (18, 0.5, 100000),    # P2 brake
-            (18, 10000, 10000),   # dud
+            (action_first_index + 5, 10000, 10000),   # dud
         ]
 
         discretized_actions = torch.stack([
@@ -84,23 +92,19 @@ class DQNModel(nn.Module):
             )
             for input_idx, lower_bound, upper_bound in action_extraction_info
         ], dim=-1)
-        return torch.cat([input_tensor[:, :17], discretized_actions], dim=-1)
+        return torch.cat([input_tensor[:, :action_first_index], discretized_actions], dim=-1)
 
     @staticmethod
     def flip_input_for_blue(input_tensor: Tensor, is_blue: Tensor) -> Tensor:
-        assert input_tensor.size(-1) == 24, \
+        assert input_tensor.size(-1) == 20, \
             f'Input tensor size {input_tensor.shape} does not match expected size'
         should_flip_feature = torch.zeros(input_tensor.size(-1), dtype=torch.bool)
         should_flip_feature[1] = True  # ball to defence goal angle
         should_flip_feature[3] = True  # ball to attack goal angle
         should_flip_feature[5] = True  # player 1 angle
-        should_flip_feature[6] = True  # player 1 to ball angle
-        should_flip_feature[8] = True  # player 2 angle
-        should_flip_feature[9] = True  # player 2 to ball angle
-        should_flip_feature[11] = True  # opponent 1 angle
-        should_flip_feature[12] = True  # opponent 1 to ball angle
-        should_flip_feature[14] = True  # opponent 2 angle
-        should_flip_feature[15] = True  # opponent 2 to ball angle
+        should_flip_feature[7] = True  # player 1 to ball angle
+        should_flip_feature[9] = True  # player 2 angle
+        should_flip_feature[11] = True  # player 2 to ball angle
 
         flip_multiple = torch.where(should_flip_feature, -1., 1.).to(input_tensor.device)
         return torch.where(is_blue[:, None], input_tensor * flip_multiple[None, :], input_tensor)
@@ -202,3 +206,8 @@ class DQNPlayerModel(nn.Module):
             output_tensor[1] *= -1
 
         return output_tensor
+
+
+class DQNNoOpModel(nn.Module):
+    def forward(self, _: Tensor):
+        return torch.zeros(6, dtype=torch.float32)

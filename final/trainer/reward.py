@@ -25,6 +25,9 @@ class RewardCriterion(IntFlag):
     # Reward for scoring and penality for getting scored against
     SCORE = auto()
 
+    # Custom reward for DDQN
+    DDQN_CUSTOM = auto()
+
 
 class RewardCriteria:
     '''
@@ -48,6 +51,8 @@ def get_match_rewards(match_data: List[dict], team_id: int, reward_criteria: Rew
         rewards += _get_ball_to_goal_dist_rewards(match_data, team_id)
     if RewardCriterion.SCORE in reward_criteria:
         rewards += _get_score_rewards(match_data, team_id)
+    if RewardCriterion.DDQN_CUSTOM in reward_criteria:
+        rewards += _get_ddqn_rewards(match_data, team_id)
 
     return list(rewards.numpy())
 
@@ -123,4 +128,40 @@ def _get_score_rewards(match_data: List[dict], team_id: int) -> Tensor:
     ], dtype=torch.float32)
 
     rewards = utilities[1:] - utilities[:-1]
+    return rewards
+
+
+def _get_ddqn_rewards(match_data: List[dict], team_id: int) -> Tensor:
+    score_multiplier = 10
+    score_rewards = torch.tensor([
+        (frame_data['soccer_state']['score'][team_id]
+         - frame_data['soccer_state']['score'][(team_id + 1) % 2]
+         ) * score_multiplier
+        for frame_data in match_data
+    ], dtype=torch.float32)
+
+    player_to_ball_utilities = torch.tensor([
+        -1. * torch.tensor(_players_dist_from_ball(frame_data[f'team{team_id + 1}_state'],
+                                                   frame_data['soccer_state'])
+                           ).sum().item()
+        for frame_data in match_data
+    ], dtype=torch.float32)
+
+    player_to_ball_rewards = player_to_ball_utilities[1:] - player_to_ball_utilities[:-1]
+    player_to_ball_rewards = ((player_to_ball_rewards - player_to_ball_rewards.mean())
+                              / player_to_ball_rewards.std())
+
+    ball_to_goal_utilities = torch.tensor([
+        (
+            -1. * torch.tensor(_dist_from_goals(frame_data['soccer_state'], team_id))
+            * torch.tensor([-1, 1])
+        ).sum().item()
+        for frame_data in match_data
+    ], dtype=torch.float32)
+
+    ball_to_goal_rewards = ball_to_goal_utilities[1:] - ball_to_goal_utilities[:-1]
+    ball_to_goal_rewards = ((ball_to_goal_rewards - ball_to_goal_rewards.mean())
+                              / ball_to_goal_rewards.std())
+
+    rewards = player_to_ball_rewards + ball_to_goal_rewards + score_rewards[1:]
     return rewards
