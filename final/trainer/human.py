@@ -49,6 +49,8 @@ def train(_: argparse.Namespace):
                                      RewardCriterion.SCORE)
 
     generate_data(
+        match, human_model, human_model, 1, reward_criteria)
+    generate_data(
         match, human_model, human_model, 1, reward_criteria,
         video_path='human-test.mp4')
 

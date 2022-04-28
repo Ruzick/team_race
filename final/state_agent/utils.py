@@ -32,8 +32,13 @@ def get_kart_to_ball_tensor(kart_state: dict, ball_center: Tensor) -> Tensor:
     # kart_to_puck_angle_difference = limit_period((kart_angle - kart_to_puck_angle) / np.pi)
     kart_to_puck_distance = torch.norm(kart_to_puck_direction)
 
+    kart_velocity = torch.tensor(kart_state['velocity'], dtype=torch.float32)[[0, 2]]
+    # kart_velocity_angle = torch.atan2(kart_velocity[1], kart_velocity[0])
+    kart_signed_speed = (torch.sign(torch.dot(kart_direction, kart_velocity))
+                         * torch.linalg.norm(kart_velocity))
+
     return torch.tensor(
-        [kart_angle, kart_to_puck_angle, kart_to_puck_distance],
+        [kart_angle, kart_signed_speed, kart_to_puck_angle, kart_to_puck_distance],
         dtype=torch.float32)
 
 

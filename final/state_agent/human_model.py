@@ -1,3 +1,4 @@
+from typing import Tuple
 from torch import Tensor, nn
 import torch
 
@@ -21,19 +22,20 @@ class HumanModel(nn.Module):
         input_tensor = input_tensor.to(self.device)
 
         output_tensor: Tensor = torch.tensor([
-            0.5, self.get_steering(input_tensor, 0), 0.,
-            1., self.get_steering(input_tensor, 1), 0.,
+            *self.get_player_action(input_tensor, 0),
+            *self.get_player_action(input_tensor, 1),
         ], dtype=torch.float32)
 
         output_tensor = self.clip_output(output_tensor)
         return torch.squeeze(output_tensor).to(original_device)
 
-    @staticmethod
-    def get_steering(input_tensor, i_player: int):
-        kart_angle_index = 5 + 3 * i_player
-        kart_to_ball_angle_index = kart_angle_index + 1
+    def get_player_action(self, input_tensor, i_player: int) -> Tuple[float, float, float]:
+        kart_velocity_angle_index = 5 + 4 * i_player
+        kart_signed_speed_index = kart_velocity_angle_index + 1
+        kart_signed_speed = float(input_tensor[kart_signed_speed_index])
+        kart_to_ball_angle_index = kart_signed_speed_index + 1
         kart_to_ball_relative_angle = limit_period(float(
-            input_tensor[kart_angle_index] - input_tensor[kart_to_ball_angle_index]
+            input_tensor[kart_velocity_angle_index] - input_tensor[kart_to_ball_angle_index]
         ) / torch.pi)
 
         # is_blue = float(input_tensor[0]) != 0
@@ -43,7 +45,7 @@ class HumanModel(nn.Module):
         steering_multiplier = 10000.
 
         steer = steering_multiplier * kart_to_ball_relative_angle
-        return steer
+        return 1., steer, 0.
 
     @staticmethod
     def clip_output(output_tensor: Tensor) -> Tensor:
