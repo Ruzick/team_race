@@ -142,6 +142,16 @@ def state_to_tensor_jurgen(team_id: int,
     return result
 
 
+def state_to_tensor_human(team_id: int,
+                          team_state: List[dict],
+                          opponent_state: List[dict],
+                          soccer_state: dict,
+                          ) -> Tensor:
+    jurgen_state_tensor = state_to_tensor_jurgen(team_id, team_state, opponent_state, soccer_state)
+    human_state_tensor = state_to_tensor(team_id, team_state, opponent_state, soccer_state)
+    return torch.cat([jurgen_state_tensor, human_state_tensor])
+
+
 def load_model(filename: str = MODEL_FILENAME) -> ScriptModule:
     return torch.jit.load(path.join(path.dirname(path.abspath(__file__)), filename))
 

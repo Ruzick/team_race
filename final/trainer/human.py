@@ -3,7 +3,7 @@ import argparse
 
 import torch
 from state_agent.human_model import HumanModel
-from state_agent.utils import save_model
+from state_agent.utils import save_model, state_to_tensor_human
 from torch.jit import ScriptModule
 from tournament.runner import Match
 
@@ -48,10 +48,13 @@ def train(_: argparse.Namespace):
     reward_criteria = RewardCriteria(RewardCriterion.PLAYER_TO_BALL_DIST,
                                      RewardCriterion.SCORE)
 
-    generate_data(
-        match, human_model, human_model, 1, reward_criteria)
+    # generate_data(
+    #     match, human_model, human_model, 1, reward_criteria,
+    #     # video_path='human-test.mp4',
+    #     state_to_tensor_fn=state_to_tensor_human)
     generate_data(
         match, human_model, human_model, 1, reward_criteria,
-        video_path='human-test.mp4')
+        video_path='human-test.mp4',
+        state_to_tensor_fn=state_to_tensor_human)
 
     save_model(human_model)
