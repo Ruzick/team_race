@@ -8,7 +8,7 @@ import torch
 
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
-DATA_PATH = 'img_data'
+DATA_PATH = 'img_data' #imag_data normalized coordinates
 
 
 class DenseSuperTuxDataset(Dataset):
@@ -65,19 +65,20 @@ class DetectionSuperTuxDataset(Dataset):
     #     if self.transform is not None:
     #         data = self.transform(*data)
     #     return data
-    def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=20):
+    def __init__(self, dataset_path, transform=dense_transforms.ToTensor(), min_size=2):
         from glob import glob
         from os import path
         self.files = []
-        for im_f in glob(path.join(dataset_path, '*_segmentation.png')):
-            self.files.append(im_f.replace('_segmentation.png', ''))
+        for im_f in glob(path.join(dataset_path, '*npz')):
+            self.files.append(im_f.replace('.npz', ''))
         self.transform = transform
         self.min_size = min_size
 
-    # def _filter(self, boxes):
-    #     if len(boxes) == 0:
-    #         return boxes
-    #     return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
+    def _filter(self, boxes):
+        if len(boxes) == 0:
+            return boxes
+        # return boxes[abs(boxes[:, 3] - boxes[:, 1]) * abs(boxes[:, 2] - boxes[:, 0]) >= self.min_size]
+        return boxes[abs(boxes[:,1]) +abs( boxes[:,2]) >= self.min_size]
 
     def __len__(self):
         return len(self.files)
@@ -87,7 +88,8 @@ class DetectionSuperTuxDataset(Dataset):
         b = self.files[idx]
         im = Image.open(b + '.png')
         nfo = np.load(b + '.npz')
-        data =im  ,np.int32(nfo['puck']) #np.int32(nfo['kart'])
+        data =im  , self._filter(np.int32(nfo['puck'])) ,self._filter(np.int32(nfo['kart']))
+        # print( np.int32(nfo['kart']), np.int32(nfo['puck']))
         if self.transform is not None:
             data = self.transform(*data)
         return data

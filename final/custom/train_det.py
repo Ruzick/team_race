@@ -44,9 +44,9 @@ def train(args):
             loc = (loc).to(device)
             det = model.detect(img)
             print(img.size())  #torch.Size([32, 3, 300, 400])
-            print('det', det) #32x1x200x300  32xclassxheightxwidth but i get a [123, 232]
+            print('det', det) #32x1x200x300  32xclassxheightxwidth b
             print('loc', loc) #32x ]123,233]
-            print(len(det))
+            print('len', len(det[0]))
             # Continuous version of focal loss
             p_det = torch.sigmoid(det * (1-2*loc))
             det_loss_val = (det_loss(det, loc)*p_det).mean() / p_det.mean()
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num_epoch', type=int, default=120)
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-3)
     parser.add_argument('-c', '--continue_training', action='store_true')
-    parser.add_argument('-t', '--transform',default='Compose([ ToTensor()   ] ) ') #, ToHeatmap(2)  ])')
+    parser.add_argument('-t', '--transform',default='Compose([ ToTensor()  ])')
     parser.add_argument('-w', '--size-weight', type=float, default=0.01)
 
     args = parser.parse_args()

@@ -116,7 +116,7 @@ class Detector(torch.nn.Module):
         all_lists= []
         for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
             peaks_per_object = []
-            current_list = extract_peak(hm[0][channel], max_det = 30)
+            current_list = extract_peak(hm[0][channel], max_det = 60)
             # if len(current_list) == 0:
             #     if channel ==0:
             #         print("no object detected", current_list,channel)
@@ -145,7 +145,7 @@ class Detector(torch.nn.Module):
                 #      float(size_h_w[0,1,int(each_object[2]),int(each_object[1])] ) ,\
                 #           float(size_h_w[0,0,each_object[2],each_object[1]])  ) ) 
                 
-                peaks_per_object.append(    ( int(each_object[1]),int(each_object[2])))
+                peaks_per_object.append(    [ int(each_object[1]),int(each_object[2])])
 
 
             all_lists.append(peaks_per_object)
