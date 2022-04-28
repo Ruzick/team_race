@@ -149,7 +149,7 @@ def _get_ddqn_rewards(match_data: List[dict], team_id: int) -> Tensor:
 
     player_to_ball_rewards = player_to_ball_utilities[1:] - player_to_ball_utilities[:-1]
     player_to_ball_rewards = ((player_to_ball_rewards - player_to_ball_rewards.mean())
-                              / player_to_ball_rewards.std())
+                              / (player_to_ball_rewards.std() + 1e-4))
 
     ball_to_goal_utilities = torch.tensor([
         (
@@ -161,7 +161,7 @@ def _get_ddqn_rewards(match_data: List[dict], team_id: int) -> Tensor:
 
     ball_to_goal_rewards = ball_to_goal_utilities[1:] - ball_to_goal_utilities[:-1]
     ball_to_goal_rewards = ((ball_to_goal_rewards - ball_to_goal_rewards.mean())
-                              / ball_to_goal_rewards.std())
+                            / (ball_to_goal_rewards.std() + 1e-4))
 
     rewards = player_to_ball_rewards + ball_to_goal_rewards + score_rewards[1:]
     return rewards
