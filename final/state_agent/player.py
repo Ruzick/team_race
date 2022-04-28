@@ -42,7 +42,7 @@ class Team:
                  'tux', 'wilber', 'xue'. Default: 'tux'
         """
         self.team, self.num_players = team, num_players
-        return ['tux'] * num_players
+        return ['sara_the_racer'] * num_players
 
     def act(self, player_state: List[dict], opponent_state: List[dict], soccer_state: dict):
         """
