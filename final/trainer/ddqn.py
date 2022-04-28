@@ -115,6 +115,7 @@ def train(args: argparse.Namespace):
 
         generated_dataset = generate_data(
             match, dqn_player_model, noop_player_model, 1, reward_criteria,
+            use_blue_data=False,
             num_frames=args.num_frames,
             state_to_tensor_fn=state_to_tensor_ddqn,
             video_path=get_video_path(i_epoch, args.video_epochs_interval, 'red'))
