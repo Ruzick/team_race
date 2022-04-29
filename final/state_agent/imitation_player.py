@@ -1,4 +1,3 @@
-
 from typing import List, Optional
 import numpy as np
 import torch
@@ -14,7 +13,7 @@ class Team:
           We will call this function with default arguments only
         """
         self.team : int =0
-        self.num_players: int = 0
+        self.num_players: int = 2
 
         if model is not None:
             self.model: ScriptModule = model
@@ -42,7 +41,7 @@ class Team:
         self.kart = np.random.choice(karts, num_players,replace = False )
         return  list(self.kart)# ['tux'] * num_players
 
-    def act(self, player_state: List[dict], opponent_state: List[dict], soccer_state: dict):
+    def act(self, player_state, opponent_state, soccer_state):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -77,15 +76,16 @@ class Team:
 
         features = state_to_tensor(self.team, player_state, opponent_state,
                                    soccer_state)
-        p1_accel, p1_steer, p1_brake, p2_accel, p2_steer, p2_brake = self.model(features)
+        p1_accel, p1_steer, p1_brake,  p2_accel, p2_steer, p2_brake = self.model(features)
+        p1_accel, p1_steer, p1_brake,  p2_accel, p2_steer, p2_brake = torch.sigmoid(p1_accel), p1_steer, torch.nn.Threshold(0.8, bool(p1_brake), 0),  torch.sigmoid(p2_accel)*2, p2_steer, torch.nn.Threshold(0.8, bool(p2_brake), 0)
         return  [
-            {
+          {
                 'acceleration': p1_accel,
                 'steer': p1_steer,
                 'brake': p1_brake,
             },
             {
-                'acceleration': p2_accel,
+                'acceleration':p2_accel,
                 'steer': p2_steer,
                 'brake': p2_brake,
             },

@@ -8,7 +8,7 @@ from torchsummary import summary
 from torchvision.ops import sigmoid_focal_loss
 from functools import partial
 from pathlib import Path
-from .model_det import Detector, save_model
+from .model_det2 import Detector, save_model
 from .utils import load_detection_data
 from . import dense_transforms
 

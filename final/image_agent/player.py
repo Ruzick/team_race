@@ -1,6 +1,10 @@
-
+import numpy as np
 class Team:
     agent_type = 'image'
+
+    acceleration = [0]*2
+    steer = [0]*2
+    brake = [False]*2
 
     def __init__(self):
         """
@@ -26,7 +30,7 @@ class Team:
         self.team, self.num_players = team, num_players
         return ['tux'] * num_players
 
-    def act(self, player_state, player_image):
+    def act(self, player_state, player_image, ball_location):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -62,4 +66,41 @@ class Team:
                  steer:        float -1..1 steering angle
         """
         # TODO: Change me. I'm just cruising straight
-        return [dict(acceleration=1, steer=0)] * self.num_players
+
+
+        for i in range(2):
+
+          proj = np.array(player_state[i]['camera']['projection']).T
+          view = np.array(player_state[i]['camera']['view']).T
+        #   print(np.float16(ball_location))
+          v = view @ np.float16(list(ball_location) + [1])
+          if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #if puck in view, follow puck
+
+            p = proj @ view @ np.float16(list(ball_location) + [1])
+            aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+            x,y = aim[0], aim[1]
+            if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
+              self.acceleration[i] = 1.0 
+            else:
+              self.acceleration[i] = 0
+
+            if x<0:
+              #action.drift=True
+              self.steer[i]=-1
+
+            elif x>0:
+              #action.drift=False
+              self.steer[i]=1
+
+  
+          
+          
+          else: #if puck not in view turn around 
+            self.steer[i] = 1
+            self.brake[i] = True
+        
+
+                    
+                   
+
+        return [{'acceleration':self.acceleration[0], 'steer':self.steer[0], 'brake':self.brake[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1], 'brake':self.brake[1]}]

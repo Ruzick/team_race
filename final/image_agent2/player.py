@@ -1,28 +1,16 @@
 
-from typing import List, Optional
-import numpy as np
-import torch
-from torch.jit import ScriptModule
-from .utils import load_model, state_to_tensor
-
 class Team:
-    agent_type = 'state'
+    agent_type = 'image'
 
-    def __init__(self, model: Optional[ScriptModule] = None):
+    def __init__(self):
         """
           TODO: Load your agent here. Load network parameters, and other parts of our model
           We will call this function with default arguments only
         """
-        self.team : int =0
-        self.num_players: int = 0
+        self.team = None
+        self.num_players = None
 
-        if model is not None:
-            self.model: ScriptModule = model
-        else:
-            device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-            self.model: ScriptModule = load_model().to(device)
-
-    def new_match(self, team: int, num_players: int) -> List[str]:
+    def new_match(self, team: int, num_players: int) -> list:
         """
         Let's start a new match. You're playing on a `team` with `num_players` and have the option of choosing your kart
         type (name) for each player.
@@ -35,14 +23,10 @@ class Team:
         """
            TODO: feel free to edit or delete any of the code below
         """
-        karts =  [ 'adiumy', 'amanda', 'beastie', 'emule', 'gavroche', 'gnu', 'hexley',
-                 'kiki', 'konqi', 'nolok', 'pidgin', 'puffy', 'sara_the_racer', 'sara_the_wizard', 'suzanne', 'tux',
-                 'wilber', 'xue']
         self.team, self.num_players = team, num_players
-        self.kart = np.random.choice(karts, num_players,replace = False )
-        return  list(self.kart)# ['tux'] * num_players
+        return ['tux'] * num_players
 
-    def act(self, player_state: List[dict], opponent_state: List[dict], soccer_state: dict):
+    def act(self, player_state, player_image, ball_location):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -50,7 +34,13 @@ class Team:
 
         :param player_state: list[dict] describing the state of the players of this team. The state closely follows
                              the pystk.Player object <https://pystk.readthedocs.io/en/latest/state.html#pystk.Player>.
-                             You can ignore the camera here.
+                             See HW5 for some inspiration on how to use the camera information.
+                             camera:  Camera info for each player
+                               - aspect:     Aspect ratio
+                               - fov:        Field of view of the camera
+                               - mode:       Most likely NORMAL (0)
+                               - projection: float 4x4 projection matrix
+                               - view:       float 4x4 view matrix
                              kart:  Information about the kart itself
                                - front:     float3 vector pointing to the front of the kart
                                - location:  float3 location of the kart
@@ -58,11 +48,9 @@ class Team:
                                - size:      float3 dimensions of the kart
                                - velocity:  float3 velocity of the kart in 3D
 
-        :param opponent_state: same as player_state just for other team
-
-        :param soccer_state: dict  Mostly used to obtain the puck location
-                             ball:  Puck information
-                               - location: float3 world location of the puck
+        :param player_image: list[np.array] showing the rendered image from the viewpoint of each kart. Use
+                             player_state[i]['camera']['view'] and player_state[i]['camera']['projection'] to find out
+                             from where the image was taken.
 
         :return: dict  The action to be taken as a dictionary. For example `dict(acceleration=1, steer=0.25)`.
                  acceleration: float 0..1
@@ -74,20 +62,4 @@ class Team:
                  steer:        float -1..1 steering angle
         """
         # TODO: Change me. I'm just cruising straight
-
-        features = state_to_tensor(self.team, player_state, opponent_state,
-                                   soccer_state)
-        p1_accel, p1_steer, p1_brake, p2_accel, p2_steer, p2_brake = self.model(features)
-        return  [
-            {
-                'acceleration': p1_accel,
-                'steer': p1_steer,
-                'brake': p1_brake,
-            },
-            {
-                'acceleration': p2_accel,
-                'steer': p2_steer,
-                'brake': p2_brake,
-            },
-        ]
-        # [dict(acceleration=1, steer=0)] * self.num_players
+        return [dict(acceleration=1, steer=0)] * self.num_players

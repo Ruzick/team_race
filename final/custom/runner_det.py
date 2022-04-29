@@ -6,7 +6,7 @@ from os import makedirs
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
-DATASET_PATH = 'image_data3'
+DATASET_PATH = 'image_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 
@@ -120,7 +120,7 @@ class Match:
     """
         Do not create more than one match per process (use ray to create more)
     """
-    def __init__(self, use_graphics=False, logging_level=None):
+    def __init__(self, use_graphics=True, logging_level=None):
         # DO this here so things work out with ray
         import pystk
         self._pystk = pystk
@@ -232,21 +232,10 @@ class Match:
                 puck_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.projectile)
                 b = np.zeros([300,400])
                 mask = np.stack((255*kart_mask,255*puck_mask,b),axis=-1) #segmentation labels 
-                
-                proj = np.array(state.players[i].camera.projection).T
-                view = np.array(state.players[i].camera.view).T
-                v = view @ np.array(list(state.soccer.ball.location) + [1])
-                if np.dot(proj[0:3,2:3].T,v[0:3].reshape([-1,1])) >0:
-                    
-                    print('in front')
-                    
-                    p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
-                    aim_point_image = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1)
-                    if np.sum(puck_mask)>0: #if there is puck in the image
 
+                if np.sum(puck_mask)>0: #if there is puck in the image
+                    data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8))
 
-                        # data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8))
-                        data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), aim_point_image)
     
             if self._use_graphics:
                 team1_images = [np.array(race.render_data[i].image) for i in range(0, len(race.render_data), 2)] 
@@ -256,13 +245,13 @@ class Match:
             if t1_can_act:
                 if t1_type == 'image':
                     #team1_actions_delayed = self._r(team1.act)(team1_state, team1_images)
-                    team1_actions_delayed = self._r(team1.act)(team1_state, team1_images, state.soccer.ball.location)
+                    team1_actions_delayed = self._r(team1.act)(team1_state, team1_images, ball_location =state.soccer.ball.location)
                 else:
                     team1_actions_delayed = self._r(team1.act)(team1_state, team2_state, soccer_state)
 
             if t2_can_act:
                 if t2_type == 'image':
-                    team2_actions_delayed = self._r(team2.act)(team2_state, team2_images)
+                    team2_actions_delayed = self._r(team2.act)(team2_state, team2_images,ball_location = state.soccer.ball.location)
                 else:
                     team2_actions_delayed = self._r(team2.act)(team2_state, team1_state, soccer_state)
 
@@ -288,7 +277,7 @@ class Match:
 
             if record_fn:
                 self._r(record_fn)(team1_state, team2_state, soccer_state=soccer_state, actions=actions,
-                                   team1_images=team1_images, team2_images=team2_images)
+                                   team1_images=team1_images, team2_images=team2_images )
 
             logging.debug('  race.step  [score = {}]'.format(state.soccer.score))
             if (not race.step([self._pystk.Action(**a) for a in actions]) and num_player) or sum(state.soccer.score) >= max_score:
@@ -352,8 +341,24 @@ if __name__ == '__main__':
         except OSError:
             pass
 
+        '''
+
         n=1
-        def collect(im1, im2, aim_point): 
+        def collect(im, pt): #can use this as is for data collection 
+            from PIL import Image
+            from os import path
+            global n
+            #id = n if n < args.n_images else np.random.randint(0, n + 1)
+            #if id < args.n_images:
+            fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
+            Image.fromarray(im).save(fn + '.png')
+            with open(fn + '.csv', 'w') as f:
+                f.write('%0.1f,%0.1f,%0.1f' % tuple(pt))
+            n += 1
+
+        '''
+        n=1
+        def collect(im1, im2): 
             from PIL import Image
             from os import path
             global n
@@ -361,22 +366,22 @@ if __name__ == '__main__':
             Image.fromarray(im1).save(fn + '.png')
 
             Image.fromarray(im2).save(fn + '_segmentation'+'.png')
-            
-            with open(fn + '.csv', 'w') as f:
-                f.write('%0.1f,%0.1f' % tuple(aim_point))
             n += 1
+
+
+        
+
 
         try:
             result = match.run(team1, team2, args.num_players, args.num_frames, max_score=args.max_score,
                                initial_ball_location=args.ball_location, initial_ball_velocity=args.ball_velocity,
                                record_fn=recorder, data_callback=collect)
-            print('Match results', result)
         except MatchException as e:
             print('Match failed', e.score)
             print(' T1:', e.msg1)
             print(' T2:', e.msg2)
 
-
+        print('Match results', result)
 
     else:
         # Fire up ray

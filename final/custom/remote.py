@@ -1,6 +1,6 @@
-from . import Data
-from tournament.runner import Match, TeamRunner
-from tournament.utils import (BaseRecorder, DataRecorder, MultiRecorder,
+from custom.Data import Match, TeamRunner
+# from custom.runner_det import Match, TeamRunner
+from custom.utils import (BaseRecorder, DataRecorder, MultiRecorder,
                               VideoRecorder, StateRecorder)
 
 # TODO: Wrap TeamRunner and Team in ray if possible
@@ -8,11 +8,11 @@ try:
     import ray
 
     @ray.remote
-    class RayMatch(Data.Match):
+    class RayMatch(Match):
         pass
 
     @ray.remote
-    class RayTeamRunner(Data.TeamRunner):
+    class RayTeamRunner(TeamRunner):
         pass
 
     @ray.remote

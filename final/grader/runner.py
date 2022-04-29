@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from collections import namedtuple
+from . import remote
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
@@ -180,11 +181,11 @@ class Match:
         t1_type, *_ = self._g(self._r(team1.info)())
         t2_type, *_ = self._g(self._r(team2.info)())
 
-        if t1_type == 'image' or t2_type == 'image':
-            assert self._use_graphics, 'Need to use_graphics for image agents.'
+        # if t1_type == 'image' or t2_type == 'image':
+        #     assert self._use_graphics, 'Need to use_graphics for image agents.'
 
-        # Deal with crashes
-        t1_can_act, t2_can_act = self._check(team1, team2, 'new_match', 0, timeout)
+        # # Deal with crashes
+        # t1_can_act, t2_can_act = self._check(team1, team2, 'new_match', 0, timeout)
 
         # Setup the race config
         logging.info('Setting up race')

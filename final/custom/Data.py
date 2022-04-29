@@ -3,16 +3,18 @@ import numpy as np
 from collections import namedtuple
 import pystk
 from os import makedirs
-import tournament.grader
 
 TRACK_NAME = 'icy_soccer_field'
 MAX_FRAMES = 1000
-DATASET_PATH = 'image_data_seg_loc'
+DATASET_PATH = 'image_data'
 
 RunnerInfo = namedtuple('RunnerInfo', ['agent_type', 'error', 'total_act_time'])
 
 GOAL_TEAM1 = [[-10.449999809265137, 0.07000000029802322, -64.5], [10.449999809265137, 0.07000000029802322, -64.5]]
 GOAL_TEAM2 = [[10.460000038146973, 0.07000000029802322, 64.5], [-10.510000228881836, 0.07000000029802322, 64.5]]
+
+
+Goals = [[0, 0.07000000029802322, -64.5], [0, 0.07000000029802322, 64.5]]
 
 #coordinates of the field [[-43.0,-64.5],[43,0,64.5]]
 
@@ -227,20 +229,57 @@ class Match:
 
 
 
-            #segmentation labels
+            #labels
             for i in range(len(race.render_data)):
                 kart_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.kart)
                 puck_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.projectile)
                 b = np.zeros([300,400])
-                mask = np.stack((255*kart_mask,255*puck_mask,b),axis=-1) #segmentation labels 
+                mask = np.stack((255*kart_mask,255*puck_mask,b),axis=-1) #segmentation mask
 
-                if np.sum(puck_mask)>0: #if there is puck in the image
-                    proj = np.array(state.players[i].camera.projection).T
-                    view = np.array(state.players[i].camera.view).T
+
+                proj = np.array(state.players[i].camera.projection).T
+                view = np.array(state.players[i].camera.view).T
+
+                puck = []
+                V = view @ np.array(list(state.soccer.ball.location) + [1])
+                if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0:              
                     p = proj @ view @ np.array(list(state.soccer.ball.location) + [1])
-                    aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+                    aim = np.array([p[0] / p[-1], -p[1] / p[-1]])
+                    if np.abs(aim[0]) < 1 and np.abs(aim[1]) < 1:
+                        x_puck = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                        y_puck = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
+                        puck.append([x_puck, y_puck]) #puck in view
 
-                    data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), aim)
+                k = []
+                for j in range(len(race.render_data)):
+                    V = view @ np.array(list(state.players[j].kart.location) + [1])
+                    if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0: 
+                        p = proj @ view @ np.array(list(state.players[j].kart.location) + [1])
+                        aim = np.array([p[0] / p[-1], -p[1] / p[-1]])  
+                        if np.abs(aim[0]) <= 1 and np.abs(aim[1]) <= 1: 
+                            x_kart = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                            y_kart = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
+                            k.append([x_kart, y_kart])
+
+
+                g = []
+                for l in range(2):
+                    V = view @ np.array(list(Goals[l]) + [1])
+                    if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0:  
+                        p = proj @ view @ np.array(list(Goals[l]) + [1])
+                        aim = np.array([p[0] / p[-1], -p[1] / p[-1]])  
+                        if np.abs(aim[0]) <= 1 and np.abs(aim[1]) <= 1:  
+                            x_goal = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                            y_goal = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
+                            g.append([x_goal, y_goal])
+
+
+
+
+
+
+
+                data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), np.array(puck, dtype = np.uint16), np.array(k, dtype = np.uint16), np.array(g, dtype = np.uint16))
 
     
             if self._use_graphics:
@@ -257,7 +296,7 @@ class Match:
 
             if t2_can_act:
                 if t2_type == 'image':
-                    team2_actions_delayed = self._r(team2.act)(team2_state, team2_images)
+                    team2_actions_delayed = self._r(team2.act)(team2_state, team2_images, state.soccer.ball.location)
                 else:
                     team2_actions_delayed = self._r(team2.act)(team2_state, team1_state, soccer_state)
 
@@ -364,16 +403,14 @@ if __name__ == '__main__':
 
         '''
         n=1
-        def collect(im1, im2,pt): 
+        def collect(im1, im2, puck, kart, goal): 
             from PIL import Image
             from os import path
             global n
             fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
             Image.fromarray(im1).save(fn + '.png')
-
             Image.fromarray(im2).save(fn + '_segmentation'+'.png')
-            with open(fn + '.csv', 'w') as f:
-                f.write('%0.1f,%0.1f' % tuple(pt))
+            np.savez(fn, puck = puck, kart = kart, goal = goal)
             n += 1
 
 

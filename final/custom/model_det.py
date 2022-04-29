@@ -112,6 +112,7 @@ class Detector(torch.nn.Module):
                  in order to improve this. The input data only contains information of when the puck is in front of the kart.
 
         """
+
         hm = self.forward(image)#.unsqueeze(0)) #image[None] shape is then (1 x 1 x h x w ) classes are puck and player
         all_lists= []
         for channel in range (hm.size(dim= 1)): #only one channel for now (puck)

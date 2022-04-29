@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.transforms import functional as F
 import torch
+import pystk
 
 from custom import dense_transforms
 TRACK_NAME = "icy_soccer_field_"
