@@ -65,6 +65,8 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
+        # TODO: Change me. I'm just cruising straight
+
 
         for i in range(2):
 
@@ -77,8 +79,6 @@ class Team:
             p = proj @ view @ np.array(list(ball_location) + [1])
             aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
 
-            #steer_angle = 2 * aim[0]
-            #self.steer[i] = np.clip(steer_angle, -1, 1)
             x,y = aim
 
             if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
@@ -100,7 +100,6 @@ class Team:
           else: #if puck not in view turn around 
             self.steer[i] = 1
             self.brake[i] = True
-
         
 
                     
