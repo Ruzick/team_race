@@ -100,7 +100,7 @@ class Detector(torch.nn.Module):
                 z = torch.cat([z, up_activation[i]], dim=1)
         return self.classifier(z)  # , self.size(z)
 
-    def detect(self, image, **kwargs):
+    def detect(self, image, max_det=4):
         import numpy as np
         """
            Your code here.
@@ -120,6 +120,13 @@ class Detector(torch.nn.Module):
 
         """
 
+        # Likely max objects, take care of in script:
+        # class_detects = [
+        #     ('puck', 1),
+        #     ('kart', 4),
+        #     ('goal', 1)
+        # ]
+
         if len(image.shape) < 4:
             image = image[None, ...]
 
@@ -127,7 +134,7 @@ class Detector(torch.nn.Module):
 
         detects_by_class = []
         for c in range(hm.size(1)):
-            detects = extract_peak(torch.sigmoid(hm[0][c]), max_det=30)
+            detects = extract_peak(torch.sigmoid(hm[0][c]), max_det=max_det)
             detects_by_class.append(detects)
 
         return detects_by_class
