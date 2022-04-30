@@ -3,8 +3,8 @@ from typing import List, Tuple
 
 
 class DetectionType(enum.IntEnum):
-    PUCK = 0
-    PLAYER = 1
+    PLAYER = 0
+    PUCK = 1
 
 
 class TeamDetections():
@@ -31,7 +31,7 @@ class TeamDetections():
             for object_type_detections in player_detections
         ]
 
-        did_player_see_puck = (len(player_detections) > 0
+        did_player_see_puck = (len(player_detections) > DetectionType.PUCK
                                and len(player_detections[DetectionType.PUCK]) > 0)
 
         self.detections.append(cleaned_player_detections)
