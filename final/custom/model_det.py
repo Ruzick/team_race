@@ -46,7 +46,7 @@ class Detector(torch.nn.Module):
         def forward(self, x):
             return F.relu(self.c1(x))
 
-    def __init__(self, layers=[16, 32, 64, 128], n_class=2, kernel_size=3, use_skip=True):
+    def __init__(self, layers=[16, 32, 64, 128], n_class=3, kernel_size=3, use_skip=True):
         """
            Your code here.
            Setup your detection network
@@ -115,9 +115,15 @@ class Detector(torch.nn.Module):
 
         hm = self.forward(image)#.unsqueeze(0)) #image[None] shape is then (1 x 1 x h x w ) classes are puck and player
         all_lists= []
-        for channel in range (hm.size(dim= 1)): #only one channel for now (puck)
+        for channel in range (hm.size(dim= 1)): #channel 0 : puck , channel 1: kart, channel 3, goal
             peaks_per_object = []
-            current_list = extract_peak(torch.sigmoid(hm[0][channel]), max_det = 30)
+            if channel == 0:
+                current_list = extract_peak(torch.sigmoid(hm[0][channel]), max_det = 1)
+            if channel == 1:
+                current_list = extract_peak(torch.sigmoid(hm[0][channel]), max_det = 3)
+            if channel == 2:
+                current_list = extract_peak(torch.sigmoid(hm[0][channel]), max_det = 1)
+            
             peaks_per_object.append(current_list)            # if len(current_list) == 0:
             #     if channel ==0:
             #         print("no object detected", current_list,channel)
