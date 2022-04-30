@@ -53,7 +53,7 @@ class Detector(torch.nn.Module):
         def forward(self, x):
             return F.relu(self.c1(x))
 
-    def __init__(self, layers=[16, 32, 64, 128], n_class=1, kernel_size=3, use_skip=True):
+    def __init__(self, layers=[16, 32, 64, 128], n_class=2, kernel_size=3, use_skip=True):
         """
            Your code here.
            Setup your detection network
@@ -149,7 +149,7 @@ def load_model():
     r = Detector()
     r.load_state_dict(load(path.join(path.dirname(
         path.abspath(__file__)), 'det.th'), map_location='cpu'))
-    return
+    return r
 
 
 if __name__ == '__main__':
