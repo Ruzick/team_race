@@ -9,12 +9,12 @@ from torchvision.transforms import functional as F
 class RectifyData(object):
     def __call__(self, image, *dets):
         # Note: There are some issues with the dimensions of labels with one entry
-        rectified = []
-        for det in dets:
-            if det.ndim == 1:
-                det = np.expand_dims(det, axis=0)
-            rectified.append(det)
-        rectified = tuple(rectified)
+
+        # args = tuple(np.array()
+        #             for point in det]) for det in dets)
+        # print(type(dets[0]))
+        rectified = tuple(np.atleast_2d(det) for det in dets)
+        print(rectified)
 
         return (image,) + rectified
 
@@ -96,6 +96,7 @@ def centers_to_heatmap(dets, shape, radius=2, device=None):
         peak = torch.zeros((len(dets), shape[0], shape[1]), device=device)
         for i, det in enumerate(dets):
             if len(det):
+                print(det)
                 det = torch.tensor(det.astype(
                     float), dtype=torch.float32, device=device)
 
