@@ -1,5 +1,5 @@
 from os import path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -17,6 +17,7 @@ GOAL_TEAM2 = [
     [10.460000038146973, 0.07000000029802322, 64.5],
     [-10.510000228881836, 0.07000000029802322, 64.5]
 ]
+GOALS = [GOAL_TEAM1, GOAL_TEAM2]
 
 
 class JurgenController(Controller):
@@ -32,12 +33,12 @@ class JurgenController(Controller):
             team_state: List[Dict[str, Any]],
             team_images: List[np.ndarray],
             team_detections: TeamDetections,
-            puck_global_coords: Tuple[float, float, float],
+            team_puck_global_coords: List[Optional[np.ndarray]],
             *args: Any) -> List[Dict[str, Any]]:
-        soccer_state = get_soccer_state(puck_global_coords)
 
         actions: List[Dict[str, Any]] = []
-        for player_state in team_state:
+        for i_player, player_state in enumerate(team_state):
+            soccer_state = get_soccer_state(team_puck_global_coords, i_player)
             model_input = extract_featuresV2(player_state, soccer_state, team_id)
             accel, steer, brake = self.model(model_input.to(self.device))
             actions.append({
@@ -49,14 +50,15 @@ class JurgenController(Controller):
         return actions
 
 
-def get_soccer_state(puck_global_coords: Tuple[float, float, float]):
+def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]], i_player: int):
+    if team_puck_global_coords[i_player] is not None:
+        location: List[float] = team_puck_global_coords[i_player].tolist()
+    else:
+        location = [0., 0., 0.]
     ball_state = {
-        'location': puck_global_coords
+        'location': location
     }
-    goals_state = [
-        GOAL_TEAM1,
-        GOAL_TEAM2
-    ]
+    goals_state = GOALS
     return {
         'ball': ball_state,
         'goal_line': goals_state

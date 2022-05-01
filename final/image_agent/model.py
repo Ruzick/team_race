@@ -31,18 +31,19 @@ class ImageModel(nn.Module):
             player_detections = self.detector.detect(image_tensor)
             team_detections.add_player_detections(player_detections)
 
-        puck_global_coords = get_puck_global_coords(team_state, team_detections)
+        team_puck_global_coords = get_team_puck_global_coords(team_state, team_detections)
         return self.controller.act(
-            team_id, team_state, team_images, team_detections, puck_global_coords)
+            team_id, team_state, team_images, team_detections, team_puck_global_coords)
 
 
-def get_puck_global_coords(team_state: List[Dict[str, Any]],
-                           team_detections: TeamDetections
-                           ) -> Optional[Tuple[float, float, float]]:
+def get_team_puck_global_coords(team_state: List[Dict[str, Any]],
+                                team_detections: TeamDetections
+                                ) -> List[Optional[np.ndarray]]:
 
-    detected_puck_coords: List[np.ndarray] = []
+    player_puck_coords: List[Optional[np.ndarray]] = []
     for i_player in range(len(team_detections.detections)):
         if not team_detections.did_player_see_puck[i_player]:
+            player_puck_coords.append(None)
             continue
 
         player_image_puck_coords = team_detections.get_all_detections(
@@ -52,12 +53,9 @@ def get_puck_global_coords(team_state: List[Dict[str, Any]],
             player_image_puck_coords[1],
             team_state[i_player])
 
-        detected_puck_coords.append(np.array(player_global_puck_coords))
+        player_puck_coords.append(np.array(player_global_puck_coords))
 
-    if len(detected_puck_coords) == 0:
-        return None
-
-    return tuple(np.stack(detected_puck_coords, axis=0).mean(axis=0))
+    return player_puck_coords
 
 
 def compute_puck_global_coords(x_puck: float, y_puck: float, player_state: Dict[str, Any]
