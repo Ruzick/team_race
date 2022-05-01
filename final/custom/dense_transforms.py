@@ -9,18 +9,10 @@ from torchvision.transforms import functional as F
 class RectifyData(object):
     def __call__(self, image, *dets):
         # Note: There are some issues with the dimensions of labels with one entry
+        dets = tuple(np.atleast_2d(det) if det.size !=
+                     0 else det.flatten() for det in dets)
 
-        # args = tuple(np.array()
-        #             for point in det]) for det in dets)
-        # print(type(dets[0]))
-        # rectified = tuple(np.atleast_2d(det) for det in dets)
-        rectified = []
-        for det in dets:
-            if det.size != 0:
-                rectified.append(np.atleast_2d(det))
-        rectified = tuple(rectified)
-
-        return (image,) + rectified
+        return (image,) + dets
 
 
 class RandomHorizontalFlip(object):
@@ -30,7 +22,6 @@ class RandomHorizontalFlip(object):
     def __call__(self, image, *args):
         if random.random() < self.flip_prob:
             image = F.hflip(image)
-            print(args[0])
             args = tuple(np.array([(point[0], image.width - point[1])
                          for point in points]) for points in args)
         return (image,) + args
@@ -101,7 +92,6 @@ def centers_to_heatmap(dets, shape, radius=2, device=None):
         peak = torch.zeros((len(dets), shape[0], shape[1]), device=device)
         for i, det in enumerate(dets):
             if len(det):
-                print(det)
                 det = torch.tensor(det.astype(
                     float), dtype=torch.float32, device=device)
 

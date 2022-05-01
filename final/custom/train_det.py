@@ -131,8 +131,9 @@ def train(args):
     Your code here, modify your HW3 code
     """
 
-    model = Detector(n_class=2)
-    summary(model, input_size=(args.batch_size, 3, 400, 300), depth=1)
+    n_class = 3
+    model = Detector(n_class=n_class)
+    summary(model, input_size=(args.batch_size, n_class, 400, 300), depth=1)
 
     # Load model weights if continuing
     if args.continue_from:

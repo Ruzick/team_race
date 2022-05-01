@@ -56,7 +56,7 @@ class DetectionSuperTuxDataset(Dataset):
         b = self.files[idx]
         im = Image.open(b + '.png')
         nfo = np.load(b + '.npz')
-        data = im, nfo['kart'], nfo['puck']
+        data = im, nfo['kart'], nfo['puck'], nfo['goal']
         if self.transform is not None:
             data = self.transform(*data)
         return data
