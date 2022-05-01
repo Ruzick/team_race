@@ -169,9 +169,9 @@ def train(args):
     ])
 
     train_data = load_detection_data(
-        str(args.train), num_workers=4, batch_size=args.batch_size, transform=train_transforms)
+        str(args.train), num_workers=1, batch_size=args.batch_size, transform=train_transforms)
     val_data = load_detection_data(
-        str(args.val), num_workers=4, batch_size=args.batch_size, transform=val_transforms)
+        str(args.val), num_workers=1, batch_size=args.batch_size, transform=val_transforms)
 
     # Create and run trainer
     t = Trainer(
