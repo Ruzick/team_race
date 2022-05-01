@@ -5,6 +5,8 @@ class Team:
     acceleration = [0]*2
     steer = [0]*2
     brake = [False]*2
+    Goal = [0, 0.07000000029802322, 64.5]
+    C = [0, 0.07000000029802322, 0]
 
     def __init__(self):
         """
@@ -28,7 +30,7 @@ class Team:
            TODO: feel free to edit or delete any of the code below
         """
         self.team, self.num_players = team, num_players
-        return ['tux'] * num_players
+        return ['xue'] * num_players
 
     def act(self, player_state, player_image, ball_location):
         """
@@ -75,31 +77,82 @@ class Team:
             
           v = view @ np.array(list(ball_location) + [1])
           if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #if puck in view, follow puck
-
             p = proj @ view @ np.array(list(ball_location) + [1])
-            aim = np.clip(np.array([p[0] / p[-1], -p[1] / p[-1]]), -1, 1) #image coordinates of puck
+            aim = np.array([p[0] / p[-1], -p[1] / p[-1]])
+            if np.abs(aim[0]) < 1 and np.abs(aim[1]) < 1:
 
-            x,y = aim
+              x,y = aim
+              print(x, y)
 
-            if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
-              self.acceleration[i] = 1.0 
-            else:
-              self.acceleration[i] = 0
+              if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
+                self.acceleration[i] = 1.0 
+              else:
+                self.acceleration[i] = 0
 
-            if x<0:
-              #action.drift=True
-              self.steer[i]=-1
 
-            elif x>0:
-              #action.drift=False
-              self.steer[i]=1
+              if np.abs(x)<=0.1 and np.abs(y)<0.25: #if you got the puck
+                  v = view @ np.array(list(self.Goal) + [1])
+                  if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #in the same half plane as goal
+                    p = proj @ view @ np.array(list(self.Goal) + [1])
+                    goal = np.array([p[0] / p[-1], -p[1] / p[-1]])   
+
+                    if goal[0] <0: 
+                      if x<0:
+                        #action.drift=True
+                        self.steer[i]=-1
+
+                      elif x>0:
+                        #action.drift=False
+                        self.steer[i]=0.6
+
+                    elif goal[0] >0:
+                      if x<0:
+                        self.steer[i]=-0.6
+                      elif x>0:
+                        self.steer[i]=1
+
+                  elif np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) <0:
+                    if x<0:
+                        #action.drift=True
+                        self.steer[i]=-0.6
+
+                    elif x>0:
+                      #action.drift=False
+                      self.steer[i]=1
+
+
+
+              else:
+                if x<0:
+                  #action.drift=True
+                  self.steer[i]=-1
+
+                elif x>0:
+                  #action.drift=False
+                  self.steer[i]=1
 
   
           
           
           else: #if puck not in view turn around 
-            self.steer[i] = 1
-            self.brake[i] = True
+            v = view @ np.array(list(self.C) + [1])
+            if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #in the same half plane as goal
+              p = proj @ view @ np.array(list(self.C) + [1])
+              center = np.array([p[0] / p[-1], -p[1] / p[-1]])
+
+              if center[0] <0:
+                self.steer[i] = -1
+                self.brake[i] = True
+
+              elif center[0] >0:
+                self.steer[i] = 1
+                self.brake[i] = True
+            
+            else:
+              self.acceleration[i] = 0
+              self.brake[i] = True
+              self.steer[i] = -1
+
         
 
                     
