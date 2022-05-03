@@ -91,7 +91,9 @@ class Team:
           if len(puck_location[i]) !=0: 
 
 
-              x,y = puck_location[i][0]
+              x_global, y_global = puck_location[i][0]
+              x = x_global/400*2 - 1
+              y = y_global/300*2 - 1
 
               if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
                 self.acceleration[i] = 1.0 
