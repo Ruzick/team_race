@@ -10,6 +10,7 @@ class Team:
     steer = [0]*2
     brake = [False]*2
     drift=[False]*2
+    C = [0, 0.07000000029802322, 0]
 
     def __init__(self):
         """
