@@ -9,6 +9,10 @@ from torch import nn
 from image_agent.controller import Controller
 from image_agent.detections import DetectionType, TeamDetections
 
+# Contains the number of frames for which to ignore the image after a goal.
+# During this time, the puck is assumed to be at [0., 0., 0.]. This helps
+# because the puck location is incorrectly calculated for some time after a goal.
+IGNORE_IMAGE_AFTER_GOAL_FRAMES = 17
 
 default_pucks = [np.array([0, 1, 0]), np.array([0, 1, 0])]
 
@@ -20,6 +24,9 @@ class ImageModel(nn.Module):
         self.detector: Detector = load_model().to(device)
         self.controller = controller
         self.last_pucks = default_pucks
+        self.last_avg_velocities: List[Tuple[float, float, float]] = [
+            (0., 0., 0.)
+        ] * (IGNORE_IMAGE_AFTER_GOAL_FRAMES + 3)
         # self.memory = Memory()
         # What frame of the current match
         self.i_frame = 0
@@ -39,7 +46,7 @@ class ImageModel(nn.Module):
             team_detections.add_player_detections(player_detections)
 
         team_puck_global_coords = get_team_puck_global_coords(
-            team_state, team_detections)
+            team_state, team_detections, self.last_avg_velocities)
 
         team_puck_global_coords = team_last_known(
             team_puck_global_coords, self.last_pucks)
@@ -48,7 +55,13 @@ class ImageModel(nn.Module):
         actions = self.controller.act(
             team_id, team_state, team_images, team_detections,
             team_puck_global_coords, self.i_frame)
+
         self.i_frame += 1
+        avg_velocities: List[np.ndarray] = np.stack([
+            np.array(player_state['kart']['velocity'])
+            for player_state in team_state
+        ], axis=0).mean(0)
+        self.last_avg_velocities = self.last_avg_velocities[1:] + [avg_velocities]
 
         return actions
 
@@ -125,8 +138,16 @@ def carrot_on_a_stick(puck_coords, team_state):
 
 
 def get_team_puck_global_coords(team_state: List[Dict[str, Any]],
-                                team_detections: TeamDetections
+                                team_detections: TeamDetections,
+                                last_avg_velocities: List[np.ndarray]
                                 ) -> List[Optional[np.ndarray]]:
+    # If players were not moving recently, assume a goal was scored recently.
+    # Assume the puck is in the middle of the field.
+    if were_players_still(last_avg_velocities):
+        return [
+            np.array([0., 0., 0.]),
+            np.array([0., 0., 0.])
+        ]
 
     player_puck_coords: List[Optional[np.ndarray]] = []
     for i_player in range(len(team_detections.detections)):
@@ -144,6 +165,20 @@ def get_team_puck_global_coords(team_state: List[Dict[str, Any]],
         player_puck_coords.append(np.array(player_global_puck_coords))
 
     return player_puck_coords
+
+
+def were_players_still(last_avg_velocities: List[np.ndarray]) -> bool:
+    consecutive_still_frames = 0
+    for avg_velocity in last_avg_velocities:
+        if consecutive_still_frames >= 3:
+            break
+
+        if np.count_nonzero(avg_velocity) > 0:
+            consecutive_still_frames = 0
+        else:
+            consecutive_still_frames += 1
+
+    return consecutive_still_frames >= 3
 
 
 def compute_puck_global_coords(x_puck: float, y_puck: float, player_state: Dict[str, Any]
