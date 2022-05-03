@@ -88,11 +88,11 @@ class Team:
           k = np.array([p[0] / p[-1], -p[1] / p[-1]])
 
 
-          aim = puck_location[i][0]
-          if len(aim) !=0: 
+          
+          if len(puck_location[i]) !=0: 
 
 
-              x,y = aim
+              x,y = puck_location[i][0]
 
               if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
                 self.acceleration[i] = 1.0 
