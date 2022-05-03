@@ -1,4 +1,8 @@
 import numpy as np
+import torch
+from typing import Any, Dict, List
+from ana_agent.planner import ImageModel
+
 class Team:
     agent_type = 'image'
 
@@ -14,6 +18,8 @@ class Team:
         """
         self.team = None
         self.num_players = None
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self.model = ImageModel(device).to(device)
 
     def new_match(self, team: int, num_players: int) -> list:
         """
@@ -31,7 +37,7 @@ class Team:
         self.team, self.num_players = team, num_players
         return ['xue'] * num_players
 
-    def act(self, player_state, player_image, ball_location):
+    def act(self, player_state, player_image):
         """
         This function is called once per timestep. You're given a list of player_states and images.
 
@@ -68,6 +74,9 @@ class Team:
         """
         # TODO: Change me. I'm just cruising straight
 
+        puck_location = self.model.forward(self.team, player_state, player_image)
+        print(puck_location)
+
 
         for i in range(2):
 
@@ -79,12 +88,9 @@ class Team:
           k = np.array([p[0] / p[-1], -p[1] / p[-1]])
 
 
-            
-          v = view @ np.array(list(ball_location) + [1])
-          if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: 
-            p = proj @ view @ np.array(list(ball_location) + [1])
-            aim = np.array([p[0] / p[-1], -p[1] / p[-1]])
-            if np.abs(aim[0]) < 1 and np.abs(aim[1]) < 1:
+          aim = puck_location[i]
+          if len(aim) !=0: 
+
 
               x,y = aim
 

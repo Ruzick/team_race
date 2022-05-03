@@ -6,7 +6,7 @@ from custom import dense_transforms
 from custom.model_det import Detector, load_model
 from torch import nn
 
-from image_agent.controller import Controller
+
 from image_agent.detections import DetectionType, TeamDetections
 
 
@@ -14,11 +14,10 @@ default_pucks = [np.array([0, 1, 0]), np.array([0, 1, 0])]
 
 
 class ImageModel(nn.Module):
-    def __init__(self, device: torch.device, controller: Controller):
+    def __init__(self, device: torch.device):
         super().__init__()
         self.device = device
         self.detector: Detector = load_model().to(device)
-        self.controller = controller
         self.last_pucks = default_pucks
         # self.memory = Memory()
         # What frame of the current match
@@ -38,19 +37,9 @@ class ImageModel(nn.Module):
             player_detections = self.detector.detect(image_tensor)
             team_detections.add_player_detections(player_detections)
 
-        team_puck_global_coords = get_team_puck_global_coords(
-            team_state, team_detections)
 
-        team_puck_global_coords = team_last_known(
-            team_puck_global_coords, self.last_pucks)
-        self.last_pucks = team_puck_global_coords
 
-        actions = self.controller.act(
-            team_id, team_state, team_images, team_detections,
-            team_puck_global_coords, self.i_frame)
-        self.i_frame += 1
-
-        return actions
+        return [team_detections.get_all_detections(0, DetectionType.PUCK), team_detections.get_all_detections(1, DetectionType.PUCK)]
 
 
 def players_last_known(puck_coords, last_known):
