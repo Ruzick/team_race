@@ -1,3 +1,5 @@
+from ctypes import pointer
+from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -10,12 +12,17 @@ from image_agent.controller import Controller
 from image_agent.detections import DetectionType, TeamDetections
 
 
+default_pucks = [np.array([0, 1, 0]), np.array([0, 1, 0])]
+
+
 class ImageModel(nn.Module):
     def __init__(self, device: torch.device, controller: Controller):
         super().__init__()
         self.device = device
         self.detector: Detector = load_model().to(device)
         self.controller = controller
+        self.last_pucks = default_pucks
+        # self.memory = Memory()
 
     def forward(self, team_id: int, team_state: List[Dict[str, Any]], team_images: List[np.ndarray]
                 ) -> List[Dict[str, Any]]:
@@ -26,14 +33,91 @@ class ImageModel(nn.Module):
         team_detections = TeamDetections()
 
         for player_image in team_images:
-            image_tensor = dense_transforms.ToTensor()(player_image)[0].to(self.device)
-
+            image_tensor = dense_transforms.ToTensor()(player_image)[
+                0].to(self.device)
             player_detections = self.detector.detect(image_tensor)
             team_detections.add_player_detections(player_detections)
 
-        team_puck_global_coords = get_team_puck_global_coords(team_state, team_detections)
+        team_puck_global_coords = get_team_puck_global_coords(
+            team_state, team_detections)
+
+        team_puck_global_coords = team_last_known(
+            team_puck_global_coords, self.last_pucks)
+        self.last_pucks = team_puck_global_coords
+
         return self.controller.act(
             team_id, team_state, team_images, team_detections, team_puck_global_coords)
+
+
+def players_last_known(puck_coords, last_known):
+    '''Each player updates NONE with their last known good detect'''
+    return [lk if pc is None else pc for pc, lk in zip(puck_coords, last_known)]
+
+
+def team_last_known(puck_coords, last_known):
+    '''Player gets other's coord when NONE (else last known good)'''
+
+    if puck_coords[0] is None and puck_coords[1] is None:
+        # return [last_known[1], last_known[0]]
+        return last_known
+
+    return [puck_coords[(i+1) % 2] if pc is None else pc for i, pc in enumerate(puck_coords)]
+
+
+def direction_vector(puck_coords, last_known):
+    '''[WIP] Predict next point from last couple points'''
+    filtered_coords = []
+
+    filtered = team_last_known(puck_coords, last_known)
+    for c, p1, p0 in zip(puck_coords, filtered, last_known):
+        if c is None:
+            m = np.nan_to_num((p1-p0) / (np.linalg.norm(p1-p0)+0.001))
+            # print(p0)
+            # print(p1)
+            # print(p1-p0)
+            # print(np.linalg.norm(p1-p0))
+            # filtered_coords.append(p1 + 4*m)
+            filtered_coords.append(p1 + 15*m)
+        else:
+            filtered_coords.append(p1)
+
+    return filtered_coords
+
+
+def carrot_on_a_stick(puck_coords, team_state):
+    '''[WIP] Make the kart think the puck is in front of them to the right/left in order to turn'''
+    # print(puck_coords)
+    if puck_coords[0] is None and puck_coords[1] is None:
+        # place point 30deg to front left
+        front = np.array(team_state[0]['kart']['front'])
+        center = np.array(team_state[0]['kart']['location'])
+        mag = np.nan_to_num(np.linalg.norm(front - center))
+        m = (front + (front - center)/mag) + 2*np.array([1, 0, 1])
+        left90_1 = np.flip(m)
+        left90_1[0] = left90_1[0]*-1
+
+        front = np.array(team_state[1]['kart']['front'])
+        center = np.array(team_state[1]['kart']['location'])
+        mag = np.linalg.norm(front - center)
+        m = (front + (front - center)/mag) + 2*np.array([1, 0, 1])
+        left90_2 = np.flip(m)
+        left90_2[2] = left90_2[2]*-1
+
+        return [left90_1, left90_2]
+
+    # else, share information
+    _coords = []
+    if puck_coords[0] is None:
+        _coords.append(puck_coords[1])
+    else:
+        _coords.append(puck_coords[0])
+
+    if puck_coords[1] is None:
+        _coords.append(puck_coords[0])
+    else:
+        _coords.append(puck_coords[1])
+
+    return _coords
 
 
 def get_team_puck_global_coords(team_state: List[Dict[str, Any]],

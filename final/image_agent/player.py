@@ -18,7 +18,8 @@ class Team:
         """
         self.team = None
         self.num_players = None
-        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        device = torch.device(
+            'cuda') if torch.cuda.is_available() else torch.device('cpu')
         controller = JurgenController(device)
         self.model = ImageModel(device, controller).to(device)
 

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import pystk
 
 
-def extract_peak(heatmap, max_pool_ks=7, min_score=-5, max_det=100):
+def extract_peak(heatmap, max_pool_ks=7, min_score=0.4, max_det=100):
     """
        Your code here.
        Extract local maxima (peaks) in a 2d heatmap.
@@ -53,7 +53,7 @@ class Detector(torch.nn.Module):
         def forward(self, x):
             return F.relu(self.c1(x))
 
-    def __init__(self, layers=[16, 32, 64, 128], n_class=2, kernel_size=3, use_skip=True):
+    def __init__(self, layers=[16, 32, 64, 128], n_class=3, kernel_size=3, use_skip=True):
         """
            Your code here.
            Setup your detection network
@@ -122,8 +122,8 @@ class Detector(torch.nn.Module):
 
         # Likely max objects, take care of in script:
         # class_detects = [
-        #     ('puck', 1),
         #     ('kart', 4),
+        #     ('puck', 1),
         #     ('goal', 1)
         # ]
 
