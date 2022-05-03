@@ -137,9 +137,24 @@ class Team:
           
           
           else: #if puck not in view turn around 
-            self.acceleration[i] = 0 
-            self.brake[i] = True
-            self.steer[i] = -1
+            v = view @ np.array(list(self.C) + [1])
+            if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: #in the same half plane as goal
+              p = proj @ view @ np.array(list(self.C) + [1])
+              center = np.array([p[0] / p[-1], -p[1] / p[-1]])
+              if np.abs(center[0]) < 1 and np.abs(center[1]) < 1:
+
+                if center[0] <0:
+                  self.steer[i] = -1
+                  self.brake[i] = True
+
+                elif center[0] >0:
+                  self.steer[i] = 1
+                  self.brake[i] = True
+              
+            else:
+              self.acceleration[i] = 0
+              self.brake[i] = True
+              self.steer[i] = -1
 
         
 
