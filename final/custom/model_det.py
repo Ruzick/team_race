@@ -165,14 +165,14 @@ class Detector(torch.nn.Module):
 def save_model(model):
     from torch import save
     from os import path
-    return save(model.state_dict(), path.join(path.dirname(path.abspath(__file__)), 'det.th'))
+    return save(model.state_dict(), path.join(path.dirname(path.abspath(__file__)), 'det_n3.th'))
 
 
 def load_model():
     from torch import load
     from os import path
     r = Detector()
-    r.load_state_dict(load(path.join(path.dirname(path.abspath(__file__)), 'det.th'), map_location='cpu'))
+    r.load_state_dict(load(path.join(path.dirname(path.abspath(__file__)), 'det_n3.th'), map_location='cpu'))
     return r
 
 
