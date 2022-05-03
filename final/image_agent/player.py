@@ -35,6 +35,7 @@ class Team:
                  'tux', 'wilber', 'xue'. Default: 'tux'
         """
         # TODO: feel free to edit or delete any of the code below
+        self.model.i_frame = 0.
         self.team, self.num_players = team, num_players
         return ['sara_the_racer'] * num_players
 

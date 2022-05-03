@@ -21,6 +21,8 @@ class ImageModel(nn.Module):
         self.controller = controller
         self.last_pucks = default_pucks
         # self.memory = Memory()
+        # What frame of the current match
+        self.i_frame = 0
 
     def forward(self, team_id: int, team_state: List[Dict[str, Any]], team_images: List[np.ndarray]
                 ) -> List[Dict[str, Any]]:
@@ -43,8 +45,12 @@ class ImageModel(nn.Module):
             team_puck_global_coords, self.last_pucks)
         self.last_pucks = team_puck_global_coords
 
-        return self.controller.act(
-            team_id, team_state, team_images, team_detections, team_puck_global_coords)
+        actions = self.controller.act(
+            team_id, team_state, team_images, team_detections,
+            team_puck_global_coords, self.i_frame)
+        self.i_frame += 1
+
+        return actions
 
 
 def players_last_known(puck_coords, last_known):
