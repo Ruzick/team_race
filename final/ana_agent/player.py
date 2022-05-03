@@ -75,7 +75,6 @@ class Team:
         # TODO: Change me. I'm just cruising straight
 
         puck_location = self.model.forward(self.team, player_state, player_image)
-        print(puck_location)
 
 
         for i in range(2):
