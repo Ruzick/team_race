@@ -88,7 +88,7 @@ class Team:
           k = np.array([p[0] / p[-1], -p[1] / p[-1]])
 
 
-          aim = puck_location[i]
+          aim = puck_location[i][0]
           if len(aim) !=0: 
 
 
