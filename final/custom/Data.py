@@ -227,8 +227,6 @@ class Match:
             soccer_state = to_native(state.soccer)
             team1_images = team2_images = None
 
-
-
             #labels
             for i in range(len(race.render_data)):
                 kart_mask = np.array((race.render_data[i].instance >> 24) == pystk.ObjectType.kart)
@@ -275,11 +273,25 @@ class Match:
 
 
 
+                ic = []
+                for m in range(len(state.items)):
+                    V = view @ np.array(list(state.items[m].location) + [1])
+                    if np.dot(proj[2:3,0:3],V[0:3].reshape([-1,1])) > 0: 
+                        p = proj @ view @ np.array(list(state.items[m].location) + [1])
+                        aim = np.array([p[0] / p[-1], -p[1] / p[-1]])  
+                        if np.abs(aim[0]) <= 1 and np.abs(aim[1]) <= 1: 
+                            x_item = np.clip(np.round(((aim[1] + 1) /2) * 300), 0, 300)
+                            y_item = np.clip(np.round(((aim[0] + 1) /2) * 400), 0, 400)
+                            ic.append([x_item, y_item])
 
 
 
 
-                data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), np.array(puck, dtype = np.uint16), np.array(k, dtype = np.uint16), np.array(g, dtype = np.uint16))
+
+
+
+
+                data_callback(np.array(race.render_data[i].image), mask.astype(np.uint8), np.array(puck, dtype = np.uint16), np.array(k, dtype = np.uint16), np.array(g, dtype = np.uint16), np.array(ic, dtype = np.uint16))
 
     
             if self._use_graphics:
@@ -403,14 +415,14 @@ if __name__ == '__main__':
 
         '''
         n=1
-        def collect(im1, im2, puck, kart, goal): 
+        def collect(im1, im2, puck, kart, goal, item): 
             from PIL import Image
             from os import path
             global n
             fn = path.join(args.output, TRACK_NAME + '_%05d' % n)
             Image.fromarray(im1).save(fn + '.png')
             Image.fromarray(im2).save(fn + '_segmentation'+'.png')
-            np.savez(fn, puck = puck, kart = kart, goal = goal)
+            np.savez(fn, puck = puck, kart = kart, goal = goal, item = item)
             n += 1
 
 
