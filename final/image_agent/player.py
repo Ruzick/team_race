@@ -51,6 +51,7 @@ class Team:
         """
         # TODO: feel free to edit or delete any of the code below
         self.model.i_frame = 0.
+        self.team, self.num_players = team, num_players
         return self.controller.get_kart_types(team, num_players)
 
     def act(self, player_state, player_image):
