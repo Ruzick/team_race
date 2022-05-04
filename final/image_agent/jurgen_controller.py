@@ -49,6 +49,9 @@ class JurgenController(Controller):
 
         return actions
 
+    def get_kart_types(self, team: int, num_players: int) -> List[str]:
+        return ['sara_the_racer'] * num_players
+
 
 def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]], i_player: int):
     if team_puck_global_coords[i_player] is not None:

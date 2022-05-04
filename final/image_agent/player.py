@@ -3,9 +3,24 @@
 from typing import Any, Dict, List
 
 import torch
+from image_agent.ana_controller import AnaController
+from image_agent.controller import Controller, ControllerType
 from image_agent.jurgen_controller import JurgenController
 
 from image_agent.model import ImageModel
+
+# Set this to the controller type that you want the player to use
+CONTROLLER_TYPE = ControllerType.JURGEN
+
+
+def get_controller(controller_type: ControllerType, device: torch.device) -> Controller:
+    if controller_type == ControllerType.JURGEN:
+        return JurgenController(device)
+    if controller_type == ControllerType.ANA:
+        return AnaController(device)
+
+    raise NotImplementedError('Controller not implemented (or not added here) '
+                              f'for controller type {controller_type}')
 
 
 class Team:
@@ -20,8 +35,8 @@ class Team:
         self.num_players = None
         device = torch.device(
             'cuda') if torch.cuda.is_available() else torch.device('cpu')
-        controller = JurgenController(device)
-        self.model = ImageModel(device, controller).to(device)
+        self.controller = get_controller(CONTROLLER_TYPE, device)
+        self.model = ImageModel(device, self.controller).to(device)
 
     def new_match(self, team: int, num_players: int) -> list:
         """
@@ -36,8 +51,7 @@ class Team:
         """
         # TODO: feel free to edit or delete any of the code below
         self.model.i_frame = 0.
-        self.team, self.num_players = team, num_players
-        return ['sara_the_racer'] * num_players
+        return self.controller.get_kart_types(team, num_players)
 
     def act(self, player_state, player_image):
         """
