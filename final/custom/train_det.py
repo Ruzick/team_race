@@ -8,7 +8,7 @@ from torchinfo import summary
 from torchvision.ops import sigmoid_focal_loss
 from functools import partial
 from pathlib import Path
-from .model_det import Detector, save_model
+from .model_det import Detector, DeformableDetector, save_model
 from .utils import load_detection_data
 from . import dense_transforms
 
@@ -130,10 +130,14 @@ def train(args):
     """
     Your code here, modify your HW3 code
     """
+    torch.manual_seed(args.seed)
 
+    # crop_top = 0.25
+    crop_top = 0
     n_class = 3
-    model = Detector(n_class=n_class)
-    summary(model, input_size=(args.batch_size, n_class, 400, 300), depth=1)
+    # model = Detector(n_class=n_class)
+    model = DeformableDetector(n_class=n_class, crop_top=crop_top)
+    summary(model, input_size=(args.batch_size, n_class, 300, 400), depth=1)
 
     # Load model weights if continuing
     if args.continue_from:
@@ -261,6 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--train', type=Path)
     parser.add_argument('-v', '--val', type=Path)
     parser.add_argument('-c', '--continue_from', type=Path)
+    parser.add_argument('-s', '--seed', default=4)
     parser.add_argument('--model_name', type=str, default=f"det_{epoch_time}")
 
     args = parser.parse_args()
