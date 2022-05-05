@@ -11,6 +11,12 @@ class Team:
     brake = [False]*2
     drift=[False]*2
 
+    True_neg = 0
+    True_pos= 0 
+    False_neg = 0
+    False_pos = 0
+    Goal = [0, 0.07000000029802322, 64.5]
+
     def __init__(self):
         """
           TODO: Load your agent here. Load network parameters, and other parts of our model
@@ -35,7 +41,7 @@ class Team:
            TODO: feel free to edit or delete any of the code below
         """
         self.team, self.num_players = team, num_players
-        return ['xue'] * num_players
+        return ['tux'] * num_players
 
     def act(self, player_state, player_image):
         """
@@ -72,10 +78,8 @@ class Team:
                  rescue:       bool (optional. no clue where you will end up though.)
                  steer:        float -1..1 steering angle
         """
-        # TODO: Change me. I'm just cruising straight
 
         puck_location = self.model.forward(self.team, player_state, player_image)
-
 
         for i in range(2):
 
@@ -85,11 +89,8 @@ class Team:
           kart_location = np.array(player_state[i]['kart']['location']).T
           p = proj @ view @ np.array(list(kart_location) + [1])
           k = np.array([p[0] / p[-1], -p[1] / p[-1]])
-
-
-          
-          if len(puck_location[i]) !=0: 
-
+ 
+          if len(puck_location[i]) !=0:
 
               x_global, y_global = puck_location[i][0]
               x = x_global/400*2 - 1
@@ -100,14 +101,12 @@ class Team:
               else:
                 self.acceleration[i] = 0
 
-
               if np.abs(x-k[0])<=0.1 and np.abs(y-k[1])<0.25: #if you got the puck
 
-                if abs(kart_location[0]-10) <4 and kart_location[1]>62:
+                if abs(kart_location[0]-10) <4 and kart_location[1]>62: #if close to opponent's goal and goal to the right side
                   self.brake[i]=True
                   self.steer[i]=-1  #moves the puck to the right lightly 
                   self.drift[i]=True
-
 
                 elif abs(kart_location[0]+10) <4 and kart_location[1]>62:
                   self.brake[i]=True
@@ -119,31 +118,38 @@ class Team:
                   self.steer[i]=-1  #moves the puck to the right lightly 
                   self.drift[i]=True
 
-
                 elif kart_location[0]<0 and kart_location[1]<-62:
                   self.brake[i]=True
                   self.steer[i]=1  #moves the puck to the left lightly 
                   self.drift[i]=True
 
-
               else:
-                if x<0:
+                if np.abs(x-k[0])<=0.1 and np.abs(y-k[1])<0.25: #if you got the puck
+                  v = view @ np.array(list(self.Goal) + [1])
+                  if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: 
+                    p = proj @ view @ np.array(list(self.Goal) + [1])
+                    goal = np.array([p[0] / p[-1], -p[1] / p[-1]])   
+
+                    if goal[0] <0: #if opponent's goal is far away but on the left, turn left gradually 
+
+                      self.steer[i]=1 #turn the puck to the left 
+                      self.brake[i]=True
+
+                    elif goal[0] >0: #if goal is on the right, turn right gradually 
+
+                      self.steer[i]=-1
+                      self.brake[i]=True
+
+                elif x<0:
                   self.steer[i]=-1
 
                 elif x>0:
                   self.steer[i]=1
 
-  
-          
-          
-          else: #if puck not in view turn around 
+          else: #if puck not in view turn around
+
             self.acceleration[i] = 0 
             self.brake[i] = True
             self.steer[i] = -1
-
-        
-
-                    
-                   
 
         return [{'acceleration':self.acceleration[0], 'steer':self.steer[0], 'brake':self.brake[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1], 'brake':self.brake[1]}]
