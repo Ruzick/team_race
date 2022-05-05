@@ -127,16 +127,13 @@ class Trainer:
 
 
 def train(args):
-    """
-    Your code here, modify your HW3 code
-    """
     torch.manual_seed(args.seed)
 
     # crop_top = 0.25
     crop_top = 0
     n_class = 3
-    # model = Detector(n_class=n_class)
-    model = DeformableDetector(n_class=n_class, crop_top=crop_top)
+    model = Detector(n_class=n_class)
+    # model = DeformableDetector(n_class=n_class, crop_top=crop_top)
     summary(model, input_size=(args.batch_size, n_class, 300, 400), depth=1)
 
     # Load model weights if continuing
