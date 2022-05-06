@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from custom import dense_transforms
-from custom.model_det import Detector, load_model
+from .custom import dense_transforms
+from .custom.model_det import Detector, load_model
 from torch import nn
 
 from image_agent.controller import Controller
