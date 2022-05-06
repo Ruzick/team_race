@@ -15,7 +15,6 @@ class Team:
     True_pos= 0 
     False_neg = 0
     False_pos = 0
-    Goal = [0, 0.07000000029802322, 64.5]
 
     def __init__(self):
         """
@@ -26,6 +25,8 @@ class Team:
         self.num_players = None
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.model = ImageModel(device).to(device)
+        self.frame=0
+        self.last_location = [0, 0]
 
     def new_match(self, team: int, num_players: int) -> list:
         """
@@ -41,7 +42,19 @@ class Team:
            TODO: feel free to edit or delete any of the code below
         """
         self.team, self.num_players = team, num_players
-        return ['tux'] * num_players
+
+        if self.team == 0:
+          self.Goal1 = [0, 0.07000000029802322, 64.5]
+          self.Goal2= [0, 0.07000000029802322, -64.5]
+          self.id = 1
+        else: 
+          self.Goal1 = [0, 0.07000000029802322, -64.5]
+          self.Goal2= [0, 0.07000000029802322, 64.5]
+          self.id = -1
+
+
+        return ['xue'] * num_players
+        
 
     def act(self, player_state, player_image):
         """
@@ -80,6 +93,11 @@ class Team:
         """
 
         puck_location = self.model.forward(self.team, player_state, player_image)
+        self.frame +=1
+
+       
+
+
 
         for i in range(2):
 
@@ -96,39 +114,65 @@ class Team:
               x = x_global/400*2 - 1
               y = y_global/300*2 - 1
 
-              if np.linalg.norm(player_state[i]['kart']['velocity']) < 15:
-                self.acceleration[i] = 1.0 
-              else:
-                self.acceleration[i] = 0
+              self.last_location[i]= np.sign(x)
 
-              if np.abs(x-k[0])<=0.1 and np.abs(y-k[1])<0.25: #if you got the puck
 
-                if abs(kart_location[0]-10) <4 and kart_location[1]>62: #if close to opponent's goal and goal to the right side
+
+              if np.abs(x-k[0])<=0.1 and np.abs(y-k[1])<0.25: #if you got the puck and close to the goals 
+
+
+
+                if self.team == 0 and abs(kart_location[0]-10) <4 and kart_location[1]>62: #if close to opponent's goal and goal to the right side
                   self.brake[i]=True
-                  self.steer[i]=-1  #moves the puck to the right lightly 
+                  self.steer[i]=-1  #moves puck to the right  
                   self.drift[i]=True
 
-                elif abs(kart_location[0]+10) <4 and kart_location[1]>62:
+                elif self.team == 0 and abs(kart_location[0]+10) <4 and kart_location[1]>62:
                   self.brake[i]=True
-                  self.steer[i]=1  #moves the puck to the left lightly 
+                  self.steer[i]=1  #moves puck to the left 
                   self.drift[i]=True
 
-                elif kart_location[0]>0 and kart_location[1]<-62:
+                elif self.team == 0 and kart_location[0]>0 and kart_location[1]<-62:
                   self.brake[i]=True
-                  self.steer[i]=-1  #moves the puck to the right lightly 
+                  self.steer[i]=-1  #moves puck to the right  
                   self.drift[i]=True
 
-                elif kart_location[0]<0 and kart_location[1]<-62:
+                elif self.team == 0 and kart_location[0]<0 and kart_location[1]<-62:
                   self.brake[i]=True
-                  self.steer[i]=1  #moves the puck to the left lightly 
+                  self.steer[i]=1  #moves puck to the left 
+                  self.drift[i]=True
+                
+                elif self.team == 1 and abs(kart_location[0]-10) <4 and kart_location[1] < -62: #if close to opponent's goal and goal to the right side
+                  self.brake[i]=True
+                  self.steer[i]=1  #moves puck to the right  
                   self.drift[i]=True
 
-              else:
-                if np.abs(x-k[0])<=0.1 and np.abs(y-k[1])<0.25: #if you got the puck
-                  v = view @ np.array(list(self.Goal) + [1])
+                elif self.team == 1 and abs(kart_location[0]+10) <4 and kart_location[1] <-62:
+                  self.brake[i]=True
+                  self.steer[i]=-1  #moves puck to the left 
+                  self.drift[i]=True
+
+                elif self.team == 1 and kart_location[0]>0 and kart_location[1] > 62:
+                  self.brake[i]=True
+                  self.steer[i]=1  #moves puck to the right  
+                  self.drift[i]=True
+
+                elif self.team == 1 and kart_location[0]<0 and kart_location[1] > 62:
+                  self.brake[i]=True
+                  self.steer[i]=-1  #moves puck to the left 
+                  self.drift[i]=True
+
+
+                else:
+                  if np.linalg.norm(player_state[i]['kart']['velocity']) < 18:
+                    self.acceleration[i] = 1.0 
+                  else:
+                    self.acceleration[i] = 0
+
+                  v = view @ np.array(list(self.Goal1) + [1])
                   if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: 
-                    p = proj @ view @ np.array(list(self.Goal) + [1])
-                    goal = np.array([p[0] / p[-1], -p[1] / p[-1]])   
+                    p = proj @ view @ np.array(list(self.Goal1) + [1])
+                    goal = np.array([p[0] / p[-1], -p[1] / p[-1]])   #if you got the puck and thr opponent's goal is in view 
 
                     if goal[0] <0: #if opponent's goal is far away but on the left, turn left gradually 
 
@@ -140,16 +184,59 @@ class Team:
                       self.steer[i]=-1
                       self.brake[i]=True
 
-                elif x<0:
-                  self.steer[i]=-1
+                  
+                  else: 
+                    v = view @ np.array(list(self.Goal2) + [1])
+                    if np.dot(proj[2:3,0:3],v[0:3].reshape([-1,1])) > 0: 
+                      p = proj @ view @ np.array(list(self.Goal2) + [1])
+                      goal = np.array([p[0] / p[-1], -p[1] / p[-1]])
+                      if np.abs(goal[0]) <= 1 and np.abs(goal[1]) <= 1: #if your own goal is i view 
 
-                elif x>0:
-                  self.steer[i]=1
+                        if goal[0] <0: #if opponent's goal is far away but on the left, turn left gradually 
+
+                          self.steer[i]=-1 #turn puck to left 
+                          self.brake[i]=True
+
+                        elif goal[0] >0: #turn puck to right 
+
+                          self.steer[i]=1
+                          self.brake[i]=True       
+
+              elif x>0.33 and y>0.1: #if you got the puck and close to the goal   
+                self.acceleration[i] = 0 
+                self.brake[i] = True
+                self.steer[i] = -1 
+
+              elif x<-0.33 and y>0.1: #if you got the puck and close to the goal   
+                self.acceleration[i] = 0 
+                self.brake[i] = True
+                self.steer[i] = 1 
+
+              elif x<0:
+                self.steer[i]=-1
+                if np.linalg.norm(player_state[i]['kart']['velocity']) < 18:
+                  self.acceleration[i] = 1.0 
+                else:
+                  self.acceleration[i] = 0
+
+              elif x>0:
+                self.steer[i]=1
+                if np.linalg.norm(player_state[i]['kart']['velocity']) < 18:
+                  self.acceleration[i] = 1.0 
+                else:
+                  self.acceleration[i] = 0
 
           else: #if puck not in view turn around
 
-            self.acceleration[i] = 0 
-            self.brake[i] = True
-            self.steer[i] = -1
+            if self.frame > 30:
+
+              self.acceleration[i] = 0 
+              self.brake[i] = True
+              self.steer[i] = -1 * self.last_location[i]
+              #print(self.last_location[i], self.steer[i])
+            else: 
+              self.acceleration[i] = 1
+              self.steer[i]=0
+
 
         return [{'acceleration':self.acceleration[0], 'steer':self.steer[0], 'brake':self.brake[0]}, {'acceleration':self.acceleration[1], 'steer':self.steer[1], 'brake':self.brake[1]}]
