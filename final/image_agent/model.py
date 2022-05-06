@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from custom import dense_transforms
-from custom.model_det import Detector, load_model
+from .custom import dense_transforms
+from .custom.model_det import Detector, load_model
 from torch import nn
 
 from image_agent.controller import Controller
@@ -61,7 +61,8 @@ class ImageModel(nn.Module):
             np.array(player_state['kart']['velocity'])
             for player_state in team_state
         ], axis=0).mean(0)
-        self.last_avg_velocities = self.last_avg_velocities[1:] + [avg_velocities]
+        self.last_avg_velocities = self.last_avg_velocities[1:] + [
+            avg_velocities]
 
         return actions
 
