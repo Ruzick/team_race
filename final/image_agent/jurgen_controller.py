@@ -34,8 +34,11 @@ class JurgenController(Controller):
         self.model = model.to(device)
         self.device = device
         self.prev_team_positions: Tuple[List[Tensor], List[Tensor]] = ([], [])
-        self.prev_puck_position: Tensor = torch.tensor([0., 0.], dtype=torch.float32)
-        self.prev_velocities: List[Tensor] = []
+        self.prev_team_puck_global_coords: List[Tensor] = [
+            torch.zeros(2, dtype=torch.float32),
+            torch.zeros(2, dtype=torch.float32)
+        ]
+        self.prev_puck_velocities: Tuple[List[Tensor], List[Tensor]] = ([], [])
         self.prev_frame_search_actions: Optional[List[Dict[str, Any]]] = None
 
     def act(self,
@@ -50,11 +53,11 @@ class JurgenController(Controller):
         if team_puck_global_coords[0] is None or team_puck_global_coords[1] is None:
             raise RuntimeError('These should not be None')
 
-        puck_global_coords = torch.from_numpy(
-            (team_puck_global_coords[0] + team_puck_global_coords[1]) / 2)[[0, 2]]
+        team_puck_global_coords_tensor = torch.from_numpy(
+            np.row_stack(tuple(team_puck_global_coords)))[:, [0, 2]]
         ball_search_actions = get_ball_search_actions(team_state,
-                                                      puck_global_coords,
-                                                      self.prev_puck_position,
+                                                      team_puck_global_coords_tensor[0],
+                                                      self.prev_team_puck_global_coords[0],
                                                       self.prev_frame_search_actions)
         if ball_search_actions is not None:
             self.prev_frame_search_actions = ball_search_actions
@@ -62,15 +65,17 @@ class JurgenController(Controller):
 
         self.prev_frame_search_actions = None
 
-        update_prev_velocities(puck_global_coords, self.prev_puck_position, self.prev_velocities)
-        self.prev_puck_position = puck_global_coords
+        update_prev_velocities(team_puck_global_coords_tensor,
+                               self.prev_team_puck_global_coords,
+                               self.prev_puck_velocities)
+        self.prev_team_puck_global_coords = team_puck_global_coords_tensor
 
         actions: List[Dict[str, Any]] = []
         for i_player, player_state in enumerate(team_state):
             soccer_state = get_soccer_state(team_puck_global_coords,
                                             i_player,
                                             player_state,
-                                            self.prev_velocities)
+                                            self.prev_puck_velocities)
             features_tensor = extract_featuresV2(player_state, soccer_state, team_id)
 
             action = (get_stuck_near_ball_action(self.prev_team_positions[i_player],
@@ -290,22 +295,26 @@ def get_look_around_action(player_state: Dict[str, Any], prev_puck_coords: Tenso
     # }
 
 
-def update_prev_velocities(puck_global_coords: Tensor,
-                           prev_puck_global_coords: Tensor,
-                           prev_velocities: List[Tensor]):
-    velocity = puck_global_coords - prev_puck_global_coords
-    prev_velocities.append(velocity)
-    del prev_velocities[-3:]
+def update_prev_velocities(team_puck_global_coords: List[Tensor],
+                           team_prev_puck_global_coords: List[Tensor],
+                           team_prev_puck_velocities: List[List[Tensor]]):
+    for entry in zip(team_puck_global_coords,
+                     team_prev_puck_global_coords,
+                     team_prev_puck_velocities):
+        puck_global_coords, prev_puck_global_coords, prev_puck_velocities = entry
+        velocity = puck_global_coords - prev_puck_global_coords
+        prev_puck_velocities.append(velocity)
+        del prev_puck_velocities[-3:]
 
 
 def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]],
                      i_player: int,
                      player_state: Dict[str, Any],
-                     prev_puck_velocities: List[Tensor]):
+                     prev_puck_velocities: Tuple[List[Tensor], List[Tensor]]):
     location: List[float] = team_puck_global_coords[i_player].tolist()
     if not DISABLE_ADD_MOMENTUM:
         location = get_velocity_adjusted_puck_position(
-            location, prev_puck_velocities, player_state)
+            location, prev_puck_velocities[i_player], player_state)
 
     ball_state = {
         'location': location
