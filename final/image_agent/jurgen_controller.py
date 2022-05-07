@@ -15,6 +15,8 @@ DISABLE_AFTER_GOAL_ACTION = False
 DISABLE_AVOID_PLAYER_INTERFERENCE_ACTION = False
 DISABLE_ADD_MOMENTUM = False
 
+VELOCITY_WEIGHTS = [1.]
+
 GOAL_TEAM1 = [
     [-10.449999809265137, 0.07000000029802322, -64.5],
     [10.449999809265137, 0.07000000029802322, -64.5]
@@ -38,7 +40,10 @@ class JurgenController(Controller):
             torch.zeros(2, dtype=torch.float32),
             torch.zeros(2, dtype=torch.float32)
         ]
-        self.prev_puck_velocities: Tuple[List[Tensor], List[Tensor]] = ([], [])
+        self.prev_puck_velocities: List[List[Tensor]] = [
+            [torch.zeros(2, dtype=torch.float32)],
+            [torch.zeros(2, dtype=torch.float32)]
+        ]
         self.prev_frame_search_actions: Optional[List[Dict[str, Any]]] = None
 
     def act(self,
@@ -304,13 +309,13 @@ def update_prev_velocities(team_puck_global_coords: List[Tensor],
         puck_global_coords, prev_puck_global_coords, prev_puck_velocities = entry
         velocity = puck_global_coords - prev_puck_global_coords
         prev_puck_velocities.append(velocity)
-        del prev_puck_velocities[-3:]
+        del prev_puck_velocities[:-len(VELOCITY_WEIGHTS)]
 
 
 def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]],
                      i_player: int,
                      player_state: Dict[str, Any],
-                     prev_puck_velocities: Tuple[List[Tensor], List[Tensor]]):
+                     prev_puck_velocities: List[List[Tensor]]):
     location: List[float] = team_puck_global_coords[i_player].tolist()
     if not DISABLE_ADD_MOMENTUM:
         location = get_velocity_adjusted_puck_position(
@@ -330,7 +335,7 @@ def get_velocity_adjusted_puck_position(puck_position: List[float],
                                         prev_puck_velocities: List[Tensor],
                                         player_state: Dict[str, Any]
                                         ) -> List[float]:
-    if not DISABLE_ADD_MOMENTUM:
+    if DISABLE_ADD_MOMENTUM:
         return puck_position
 
     player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
@@ -361,10 +366,11 @@ def get_velocity_adjusted_puck_position(puck_position: List[float],
 
 
 def get_puck_weighted_avg_velocity(prev_puck_velocities: List[Tensor]) -> Tensor:
-    weights = torch.tensor([1., 2., 3.], dtype=torch.float32)
+    weights = torch.tensor(VELOCITY_WEIGHTS, dtype=torch.float32)
+    weights = weights[-len(prev_puck_velocities):]
     weights /= weights.sum()
 
-    return torch.stack(prev_puck_velocities) * weights[:, None].sum(dim=0)
+    return (torch.stack(prev_puck_velocities) * weights[:, None]).sum(dim=0)
 
 
 def limit_period(angle: Tensor) -> Tensor:
