@@ -36,6 +36,9 @@ class JurgenController(Controller):
             team_puck_global_coords: List[Optional[np.ndarray]],
             *args: Any) -> List[Dict[str, Any]]:
 
+        if team_puck_global_coords[0] is None and team_puck_global_coords[1] is None:
+            return get_ball_search_actions(team_id, team_state)
+
         actions: List[Dict[str, Any]] = []
         for i_player, player_state in enumerate(team_state):
             soccer_state = get_soccer_state(team_puck_global_coords, i_player)
@@ -51,6 +54,54 @@ class JurgenController(Controller):
 
     def get_kart_types(self, team: int, num_players: int) -> List[str]:
         return ['sara_the_racer'] * num_players
+
+
+def get_ball_search_actions(_: int,
+                            team_state: List[Dict[str, Any]]
+                            ) -> List[Dict[str, Any]]:
+
+    actions: List[Dict[str, Any]] = []
+    for player_state in team_state:
+        action = (get_in_goals_action(player_state)
+                  or get_look_around_action(player_state))
+        actions.append(action)
+
+    return actions
+
+
+def get_in_goals_action(player_state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    player_location = player_state['kart']['location']
+    if -64.5 <= player_location[2] and player_location[2] <= 64.5:
+        return None
+
+    return {
+        'acceleration': 0.,
+        'steer': 0.,
+        'rescue': True,
+    }
+
+
+def get_look_around_action(player_state: Dict[str, Any]) -> Dict[str, Any]:
+    player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
+    player_center = torch.tensor(player_state['kart']['location'], dtype=torch.float32)[[0, 2]]
+    player_direction = player_front - player_center
+    player_unit_direction = player_direction / torch.norm(player_direction)
+    player_dist_from_center = torch.norm(player_center)
+
+    if player_dist_from_center > 20 and player_unit_direction.dot(player_center) < 0:
+        # Away from center and pointing inwards means accelerate and steer
+        return {
+            'acceleration': 1.,
+            'steer': 1.,
+            'brake': False,
+        }
+
+    # In the center or pointing outwards means reverse and steer
+    return {
+        'acceleration': 0.,
+        'steer': -1.,
+        'brake': True,
+    }
 
 
 def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]], i_player: int):
