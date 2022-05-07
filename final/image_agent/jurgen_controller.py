@@ -311,7 +311,7 @@ def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]],
         unit_player_direction = player_direction / torch.norm(player_direction)
         velocity_multiplier = abs(float(unit_velocity_normal.dot(unit_player_direction)))
         velocity_multiplier *= 3
-        velocity_multiplier /= max(float(torch.norm(velocity)), 1.)
+        velocity_multiplier /= float(torch.norm(velocity))
 
         # player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
         # player_center = torch.tensor(player_state['kart']['location'], dtype=torch.float32)[[0, 2]]
