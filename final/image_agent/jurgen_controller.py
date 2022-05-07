@@ -35,6 +35,7 @@ class JurgenController(Controller):
         self.device = device
         self.prev_team_positions: Tuple[List[Tensor], List[Tensor]] = ([], [])
         self.prev_puck_position: Tensor = torch.tensor([0., 0.], dtype=torch.float32)
+        self.prev_velocities: List[Tensor] = []
         self.prev_frame_search_actions: Optional[List[Dict[str, Any]]] = None
 
     def act(self,
@@ -49,24 +50,27 @@ class JurgenController(Controller):
         if team_puck_global_coords[0] is None or team_puck_global_coords[1] is None:
             raise RuntimeError('These should not be None')
 
-        puck_global_coords = torch.from_numpy(team_puck_global_coords[0])[[0, 2]]
+        puck_global_coords = torch.from_numpy(
+            (team_puck_global_coords[0] + team_puck_global_coords[1]) / 2)[[0, 2]]
         ball_search_actions = get_ball_search_actions(team_state,
                                                       puck_global_coords,
                                                       self.prev_puck_position,
                                                       self.prev_frame_search_actions)
-        self.prev_puck_position = puck_global_coords
         if ball_search_actions is not None:
             self.prev_frame_search_actions = ball_search_actions
             return ball_search_actions
 
         self.prev_frame_search_actions = None
 
+        update_prev_velocities(puck_global_coords, self.prev_puck_position, self.prev_velocities)
+        self.prev_puck_position = puck_global_coords
+
         actions: List[Dict[str, Any]] = []
         for i_player, player_state in enumerate(team_state):
             soccer_state = get_soccer_state(team_puck_global_coords,
                                             i_player,
                                             player_state,
-                                            self.prev_puck_position)
+                                            self.prev_velocities)
             features_tensor = extract_featuresV2(player_state, soccer_state, team_id)
 
             action = (get_stuck_near_ball_action(self.prev_team_positions[i_player],
@@ -286,51 +290,22 @@ def get_look_around_action(player_state: Dict[str, Any], prev_puck_coords: Tenso
     # }
 
 
+def update_prev_velocities(puck_global_coords: Tensor,
+                           prev_puck_global_coords: Tensor,
+                           prev_velocities: List[Tensor]):
+    velocity = puck_global_coords - prev_puck_global_coords
+    prev_velocities.append(velocity)
+    del prev_velocities[-3:]
+
+
 def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]],
                      i_player: int,
                      player_state: Dict[str, Any],
-                     prev_puck_position: Tensor):
+                     prev_puck_velocities: List[Tensor]):
     location: List[float] = team_puck_global_coords[i_player].tolist()
-    x_velocity = location[0] - float(prev_puck_position[0])
-    y_velocity = location[2] - float(prev_puck_position[1])
-    if not DISABLE_ADD_MOMENTUM and not (x_velocity == 0. and y_velocity == 0.):
-        x_velocity = location[0] - float(prev_puck_position[0])
-        y_velocity = location[2] - float(prev_puck_position[1])
-
-        player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
-        player_center = torch.tensor(player_state['kart']['location'], dtype=torch.float32)[[0, 2]]
-        player_direction = player_front - player_center
-
-        puck_center = torch.tensor([location[0], location[2]], dtype=torch.float32)
-        velocity = puck_center - prev_puck_position
-        # if torch.norm(velocity) >= 3:
-        #     print('puck may have teleported!', velocity)
-        velocity_normal = torch.tensor([-velocity[1], velocity[0]], dtype=torch.float32)
-
-        unit_velocity_normal = velocity_normal / torch.norm(velocity_normal)
-        unit_player_direction = player_direction / torch.norm(player_direction)
-        velocity_multiplier = abs(float(unit_velocity_normal.dot(unit_player_direction)))
-        velocity_multiplier *= 3
-        velocity_multiplier /= float(torch.norm(velocity))
-
-        # player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
-        # player_center = torch.tensor(player_state['kart']['location'], dtype=torch.float32)[[0, 2]]
-        # player_direction = player_front - player_center
-        # # player_unit_direction = player_direction / torch.norm(player_direction)
-        # player_angle = torch.atan2(player_direction[1], player_direction[0])
-
-        # # features of soccer
-        # puck_center = torch.tensor([location[0], location[2]], dtype=torch.float32)
-        # player_to_puck_direction = puck_center - player_center
-        # player_to_puck_angle = torch.atan2(player_to_puck_direction[1],
-        #                                    player_to_puck_direction[0])
-
-        # player_to_puck_angle_difference = limit_period((player_angle - player_to_puck_angle)
-        #                                                / torch.pi)
-        # velocity_multiplier = 2 * (0.5 - abs(0.5 - abs(player_to_puck_angle_difference)))
-
-        location[0] += x_velocity * velocity_multiplier
-        location[2] += y_velocity * velocity_multiplier
+    if not DISABLE_ADD_MOMENTUM:
+        location = get_velocity_adjusted_puck_position(
+            location, prev_puck_velocities, player_state)
 
     ball_state = {
         'location': location
@@ -340,6 +315,47 @@ def get_soccer_state(team_puck_global_coords: List[Optional[np.ndarray]],
         'ball': ball_state,
         'goal_line': goals_state
     }
+
+
+def get_velocity_adjusted_puck_position(puck_position: List[float],
+                                        prev_puck_velocities: List[Tensor],
+                                        player_state: Dict[str, Any]
+                                        ) -> List[float]:
+    if not DISABLE_ADD_MOMENTUM:
+        return puck_position
+
+    player_front = torch.tensor(player_state['kart']['front'], dtype=torch.float32)[[0, 2]]
+    player_center = torch.tensor(player_state['kart']['location'], dtype=torch.float32)[[0, 2]]
+    player_direction = player_front - player_center
+
+    velocity = get_puck_weighted_avg_velocity(prev_puck_velocities)
+    speed = torch.norm(velocity)
+    if speed < 1e-4:
+        return puck_position
+    # if torch.norm(velocity) >= 3:
+    #     print('puck may have teleported!', velocity)
+    velocity_normal = torch.tensor([-velocity[1], velocity[0]], dtype=torch.float32)
+
+    unit_velocity_normal: Tensor = velocity_normal / speed
+    unit_player_direction = player_direction / torch.norm(player_direction)
+    velocity_multiplier = abs(float(unit_velocity_normal.dot(unit_player_direction)))
+    velocity_multiplier *= 3
+    velocity_multiplier /= float(torch.norm(velocity))
+
+    velocity *= velocity_multiplier
+
+    return [
+        puck_position[0] + float(velocity[0].item()),
+        puck_position[1],
+        puck_position[2] + float(velocity[1].item())
+    ]
+
+
+def get_puck_weighted_avg_velocity(prev_puck_velocities: List[Tensor]) -> Tensor:
+    weights = torch.tensor([1., 2., 3.], dtype=torch.float32)
+    weights /= weights.sum()
+
+    return torch.stack(prev_puck_velocities) * weights[:, None].sum(dim=0)
 
 
 def limit_period(angle: Tensor) -> Tensor:
