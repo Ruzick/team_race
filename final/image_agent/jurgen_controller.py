@@ -35,6 +35,7 @@ class JurgenController(Controller):
         self.device = device
         self.prev_team_positions: Tuple[List[Tensor], List[Tensor]] = ([], [])
         self.prev_puck_position: Tensor = torch.tensor([0., 0.], dtype=torch.float32)
+        self.prev_puck_velocities: List[Tensor] = []
         self.prev_frame_search_actions: Optional[List[Dict[str, Any]]] = None
 
     def act(self,
@@ -54,7 +55,6 @@ class JurgenController(Controller):
                                                       puck_global_coords,
                                                       self.prev_puck_position,
                                                       self.prev_frame_search_actions)
-        self.prev_puck_position = puck_global_coords
         if ball_search_actions is not None:
             self.prev_frame_search_actions = ball_search_actions
             return ball_search_actions
@@ -79,6 +79,8 @@ class JurgenController(Controller):
             self.prev_team_positions[i_player].append(features_tensor[0:2])
             if len(self.prev_team_positions[i_player]) >= 20:
                 del self.prev_team_positions[i_player][:-20]
+
+        self.prev_puck_position = puck_global_coords
 
         return actions
 
