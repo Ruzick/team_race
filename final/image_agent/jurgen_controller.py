@@ -29,6 +29,7 @@ class JurgenController(Controller):
         self.model = model.to(device)
         self.device = device
         self.prev_team_positions: Tuple[List[Tensor], List[Tensor]] = ([], [])
+        self.prev_puck_position: Tensor = torch.tensor([0., 0.], dtype=torch.float32)
 
     def act(self,
             team_id: int,
@@ -38,8 +39,16 @@ class JurgenController(Controller):
             team_puck_global_coords: List[Optional[np.ndarray]],
             *args: Any) -> List[Dict[str, Any]]:
 
-        if team_puck_global_coords[0] is None and team_puck_global_coords[1] is None:
-            return get_ball_search_actions(team_id, team_state)
+        if team_puck_global_coords[0] is None or team_puck_global_coords[1] is None:
+            raise RuntimeError('These should not be None')
+
+        puck_global_coords = torch.from_numpy(team_puck_global_coords[0])[[0, 2]]
+        ball_search_actions = get_ball_search_actions(team_state,
+                                                      puck_global_coords,
+                                                      self.prev_puck_position)
+        self.prev_puck_position = puck_global_coords
+        if ball_search_actions is not None:
+            return ball_search_actions
 
         actions: List[Dict[str, Any]] = []
         for i_player, player_state in enumerate(team_state):
@@ -74,14 +83,20 @@ def get_action_from_model(model: ScriptModule, features_tensor: Tensor, device: 
 def get_stuck_near_ball_action(prev_player_positions: List[Tensor],
                                features_tensor: Tensor
                                ) -> Optional[Dict[str, Any]]:
-    if len(prev_player_positions) < 20:
+    if len(prev_player_positions) < 10:
         return None
 
     prev_positions_tensor = torch.stack(prev_player_positions)
+    prev_positions_start_dist: Tensor = torch.norm((prev_positions_tensor
+                                                    - prev_positions_tensor[0:1, :]),
+                                                   dim=-1)
+    if prev_positions_start_dist.max() > 5:
+        return None
+
     ball_position = features_tensor[[7, 8]]
     prev_positions_ball_dist: Tensor = torch.norm(prev_positions_tensor - ball_position[None, :],
                                                   dim=-1)
-    if prev_positions_ball_dist.max() > 10:
+    if prev_positions_ball_dist.max() > 5:
         return None
 
     kart_to_puck_angle_difference = features_tensor[6]
@@ -101,9 +116,16 @@ def get_stuck_near_ball_action(prev_player_positions: List[Tensor],
     }
 
 
-def get_ball_search_actions(_: int,
-                            team_state: List[Dict[str, Any]]
-                            ) -> List[Dict[str, Any]]:
+def get_ball_search_actions(team_state: List[Dict[str, Any]],
+                            puck_global_coords: Tensor,
+                            prev_puck_coords: Tensor,
+                            ) -> Optional[List[Dict[str, Any]]]:
+    if puck_global_coords[0] == 0. and puck_global_coords[1] == 0.:
+        return None
+
+    if puck_global_coords != prev_puck_coords:
+        return None
+
     actions: List[Dict[str, Any]] = []
     for player_state in team_state:
         action = (get_in_goals_action(player_state)
@@ -118,11 +140,13 @@ def get_in_goals_action(player_state: Dict[str, Any]) -> Optional[Dict[str, Any]
     if -64.5 <= player_location[2] and player_location[2] <= 64.5:
         return None
 
-    return {
-        'acceleration': 0.,
-        'steer': 0.,
-        'rescue': True,
-    }
+    return None
+
+    # return {
+    #     'acceleration': 0.,
+    #     'steer': 0.,
+    #     'rescue': True,
+    # }
 
 
 def get_look_around_action(player_state: Dict[str, Any]) -> Dict[str, Any]:
@@ -135,9 +159,10 @@ def get_look_around_action(player_state: Dict[str, Any]) -> Dict[str, Any]:
     if player_dist_from_center > 20 and player_unit_direction.dot(player_center) < 0:
         # Away from center and pointing inwards means accelerate and steer
         return {
-            'acceleration': 1.,
+            'acceleration': .5,
             'steer': 1.,
             'brake': False,
+            'drift': True
         }
 
     # In the center or pointing outwards means reverse and steer

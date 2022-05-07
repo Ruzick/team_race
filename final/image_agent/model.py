@@ -48,7 +48,7 @@ class ImageModel(nn.Module):
         team_puck_global_coords = get_team_puck_global_coords(
             team_state, team_detections, self.last_avg_velocities)
 
-        team_puck_global_coords = team_known_or_none(team_puck_global_coords)
+        team_puck_global_coords = team_last_known(team_puck_global_coords, self.last_pucks)
         self.last_pucks = team_puck_global_coords
 
         actions = self.controller.act(
