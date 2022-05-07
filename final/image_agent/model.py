@@ -83,7 +83,7 @@ def team_last_known(puck_coords, last_known):
 
 def team_known_or_none(puck_coords):
     if puck_coords[0] is None and puck_coords[1] is None:
-        return None
+        return [None, None]
 
     return [puck_coords[(i+1) % 2] if pc is None else pc for i, pc in enumerate(puck_coords)]
 

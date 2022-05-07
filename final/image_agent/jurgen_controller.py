@@ -1,5 +1,5 @@
 from os import path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -8,6 +8,7 @@ from torch.jit import ScriptModule
 
 from image_agent.controller import Controller
 from image_agent.detections import TeamDetections
+
 
 GOAL_TEAM1 = [
     [-10.449999809265137, 0.07000000029802322, -64.5],
@@ -27,6 +28,7 @@ class JurgenController(Controller):
             path.join(path.dirname(path.abspath(__file__)), 'jurgen_agent.pt'))
         self.model = model.to(device)
         self.device = device
+        self.prev_team_positions: Tuple[List[Tensor], List[Tensor]] = ([], [])
 
     def act(self,
             team_id: int,
@@ -42,13 +44,16 @@ class JurgenController(Controller):
         actions: List[Dict[str, Any]] = []
         for i_player, player_state in enumerate(team_state):
             soccer_state = get_soccer_state(team_puck_global_coords, i_player)
-            model_input = extract_featuresV2(player_state, soccer_state, team_id)
-            accel, steer, brake = self.model(model_input.to(self.device))
-            actions.append({
-                'acceleration': accel,
-                'steer': steer,
-                'brake': brake,
-            })
+            features_tensor = extract_featuresV2(player_state, soccer_state, team_id)
+
+            action = (get_stuck_near_ball_action(self.prev_team_positions[i_player],
+                                                 features_tensor)
+                      or get_action_from_model(self.model, features_tensor, self.device))
+            actions.append(action)
+
+            self.prev_team_positions[i_player].append(features_tensor[0:2])
+            if len(self.prev_team_positions[i_player]) >= 20:
+                del self.prev_team_positions[i_player][:-20]
 
         return actions
 
@@ -56,10 +61,49 @@ class JurgenController(Controller):
         return ['sara_the_racer'] * num_players
 
 
+def get_action_from_model(model: ScriptModule, features_tensor: Tensor, device: torch.device
+                          ) -> Dict[str, Any]:
+    accel, steer, brake = model(features_tensor.to(device))
+    return {
+        'acceleration': accel,
+        'steer': steer,
+        'brake': brake,
+    }
+
+
+def get_stuck_near_ball_action(prev_player_positions: List[Tensor],
+                               features_tensor: Tensor
+                               ) -> Optional[Dict[str, Any]]:
+    if len(prev_player_positions) < 20:
+        return None
+
+    prev_positions_tensor = torch.stack(prev_player_positions)
+    ball_position = features_tensor[[7, 8]]
+    prev_positions_ball_dist: Tensor = torch.norm(prev_positions_tensor - ball_position[None, :],
+                                                  dim=-1)
+    if prev_positions_ball_dist.max() > 10:
+        return None
+
+    kart_to_puck_angle_difference = features_tensor[6]
+    if abs(kart_to_puck_angle_difference) < 0.05:
+        # If almost point straight, go straight ahead
+        print('Surprise!')
+        return {
+            'acceleration': 1.,
+            'steer': torch.sign(kart_to_puck_angle_difference),
+            'brake': False,
+        }
+
+    return {
+        'acceleration': 0.,
+        'steer': -1. * torch.sign(kart_to_puck_angle_difference),
+        'brake': True,
+    }
+
+
 def get_ball_search_actions(_: int,
                             team_state: List[Dict[str, Any]]
                             ) -> List[Dict[str, Any]]:
-
     actions: List[Dict[str, Any]] = []
     for player_state in team_state:
         action = (get_in_goals_action(player_state)
